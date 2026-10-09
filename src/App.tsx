@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/Header';
 import { Hero } from '@/components/Hero';
 import { ConversationInput } from '@/components/ConversationInput';
@@ -17,6 +17,17 @@ export default function App() {
 
   const inputRef = useRef<HTMLDivElement>(null);
   const briefingRef = useRef<HTMLDivElement>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const analysisTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopWorker = useCallback((worker = workerRef.current) => {
+    worker?.terminate();
+    if (workerRef.current === worker) workerRef.current = null;
+    if (analysisTimeoutRef.current) clearTimeout(analysisTimeoutRef.current);
+    analysisTimeoutRef.current = null;
+  }, []);
+
+  useEffect(() => () => stopWorker(), [stopWorker]);
 
   const scrollTo = useCallback((id: string) => {
     if (id === 'hero') {
@@ -48,9 +59,11 @@ export default function App() {
     setIsProcessing(true);
     setAnalysisScope(scope ?? null);
     try {
+      stopWorker();
       const worker = new Worker(new URL('./lib/analyzer.worker.ts', import.meta.url), { type: 'module' });
+      workerRef.current = worker;
       worker.onmessage = (event: MessageEvent<{ result: BriefingResult }>) => {
-        worker.terminate();
+        stopWorker(worker);
         setResult(event.data.result);
         setIsProcessing(false);
         setTimeout(() => {
@@ -58,21 +71,34 @@ export default function App() {
         }, 50);
       };
       worker.onerror = (event) => {
-        worker.terminate();
+        stopWorker(worker);
         setError(`Analysis failed${event.message ? `: ${event.message}` : '. Please try again.'}`);
         setIsProcessing(false);
       };
       worker.onmessageerror = () => {
-        worker.terminate();
+        stopWorker(worker);
         setError('Analysis returned data the page could not read. Please try again.');
         setIsProcessing(false);
       };
+      analysisTimeoutRef.current = setTimeout(() => {
+        if (workerRef.current !== worker) return;
+        stopWorker(worker);
+        setError('Analysis timed out. Try a smaller input chunk and run it again.');
+        setIsProcessing(false);
+      }, 30_000);
       worker.postMessage({ raw: input, userName: userName.trim() || undefined });
     } catch (cause) {
+      stopWorker();
       setError(`Unable to start analysis: ${cause instanceof Error ? cause.message : 'Please try again.'}`);
       setIsProcessing(false);
     }
-  }, [userName]);
+  }, [stopWorker, userName]);
+
+  const handleCancelAnalysis = useCallback(() => {
+    stopWorker();
+    setIsProcessing(false);
+    setError(null);
+  }, [stopWorker]);
 
   const handleClear = useCallback(() => {
     setConversation('');
@@ -103,6 +129,7 @@ export default function App() {
               userName={userName}
               onUserNameChange={setUserName}
               onAnalyze={handleAnalyze}
+              onCancelAnalysis={handleCancelAnalysis}
               onClear={handleClear}
               isProcessing={isProcessing}
               error={error}

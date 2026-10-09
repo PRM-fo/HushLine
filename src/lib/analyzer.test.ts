@@ -111,6 +111,46 @@ describe('parseMessages', () => {
     expect(messages.map((message) => message.sender)).toEqual(['Unknown', 'Unknown', 'Unknown']);
     expect(messages[0].text).toBe('Step one: prepare the slides');
   });
+
+  it('parses timestamped Android and iOS lines and excludes timestamp dates from message bodies', () => {
+    const messages = parseMessages(
+      '12/05/24, 15:45 - Sarah: Please send the report by Friday\n' +
+      '[12/05/2024, 3:45:12 PM] Sarah: Please send the report by Friday\n' +
+      '\u200e[12/05/2024, 3:45:12 PM] Sarah: Please send the report by Friday'
+    );
+    expect(messages).toHaveLength(3);
+    expect(messages.map((message) => message.sender)).toEqual(['Sarah', 'Sarah', 'Sarah']);
+    expect(messages[0].timestamp).toBe('12/05/24, 15:45');
+    expect(messages[1].timestamp).toBe('12/05/2024, 3:45:12 PM');
+
+    for (const message of messages) {
+      const result = analyzeConversation(`${message.sender}: ${message.text}`);
+      expect(result.dates.map((date) => date.date)).toEqual(['by Friday']);
+    }
+  });
+
+  it('skips system and deleted-message lines and reports ignored system lines', () => {
+    const result = analyzeConversation(
+      '12/05/2024, 15:40 - Messages and calls are end-to-end encrypted\n' +
+      'Sarah: <Media omitted>\n' +
+      'Sarah: This message was deleted'
+    );
+    expect(result.messageCount).toBe(0);
+    expect(result.ignoredSystemLineCount).toBe(3);
+    expect(result.dates).toEqual([]);
+  });
+
+  it('keeps label-like continuation lines in the same message', () => {
+    const messages = parseMessages('Sarah: Agenda:\n- slides due Friday\n- demo');
+    expect(messages).toHaveLength(1);
+    expect(messages[0].sender).toBe('Sarah');
+    expect(messages[0].text).toBe('Agenda:\n- slides due Friday\n- demo');
+  });
+
+  it('accepts Hindi and Tamil sender names', () => {
+    const messages = parseMessages('अमित: नमस्ते\nகுமார்: வணக்கம்');
+    expect(messages.map((message) => message.sender)).toEqual(['अमित', 'குமார்']);
+  });
 });
 
 describe('analyzeConversation — test fixture (project group chat)', () => {
@@ -412,6 +452,160 @@ describe('analyzeConversation — edge cases', () => {
       );
       expect(result.actions).toHaveLength(1);
       expect(result.actions[0]).toMatchObject({ assignee: 'Priya', assigneeIsUser: true });
+    });
+
+    it.each([
+      ['Alex, can you send the slides by Friday?', 'Alex'],
+      ['Alex could you review this?', 'Alex'],
+      ['Alex please submit the form', 'Alex'],
+      ['@Alex can you send the slides?', 'Alex'],
+    ])('assigns a task to the name-directed participant: %s', (text, assignee) => {
+      const result = analyzeConversation(`Sarah: Hello\nAlex: Present\nSarah: ${text}`, 'Alex');
+      expect(result.actions).toContainEqual(expect.objectContaining({
+        assignee,
+        assigneeIsUser: true,
+      }));
+    });
+
+    it('assigns a name-directed task to a different participant, not the user', () => {
+      const result = analyzeConversation(
+        'Sarah: Hello\nBob: Present\nSarah: Bob, can you send the invoice?',
+        'Alex'
+      );
+      expect(result.actions).toContainEqual(expect.objectContaining({
+        assignee: 'Bob',
+        assigneeIsUser: false,
+      }));
+    });
+
+    it('does not assign unaddressed requests or use polite words as names', () => {
+      const result = analyzeConversation(
+        'Sarah: Can you send the invoice?\nBob: Please send the report\nCara: Please submit the final word count by Friday',
+        'Alex'
+      );
+      expect(result.actions).toEqual([]);
+    });
+
+    it('recognizes @Bob as an assignee without marking it as the user', () => {
+      const result = analyzeConversation('Sarah: @Bob please send the invoice');
+      expect(result.actions).toContainEqual(expect.objectContaining({
+        assignee: 'Bob',
+        assigneeIsUser: false,
+      }));
+    });
+
+    it('detects plain-name mentions without matching the user’s own messages', () => {
+      const result = analyzeConversation(
+        'Alex: The meeting moved to 3pm\nSarah: Alex, the demo moved to 3pm tomorrow',
+        'Alex'
+      );
+      expect(result.mentions).toContainEqual(expect.objectContaining({
+        mentionedUser: 'Alex',
+        isUser: true,
+        sender: 'Sarah',
+      }));
+      expect(result.mentions.some((mention) => mention.sender === 'Alex')).toBe(false);
+    });
+
+    it('marks tentative dates as tentative', () => {
+      const result = analyzeConversation('Sarah: Maybe we could do the slides by Friday?');
+      expect(result.dates).toContainEqual(expect.objectContaining({
+        date: 'by Friday',
+        status: 'tentative',
+      }));
+    });
+
+    it('distinguishes rejected and tentative decisions at clause level', () => {
+      const changed = analyzeConversation('Sarah: We are not going with React, going with Vue instead');
+      expect(changed.decisions).toContainEqual(expect.objectContaining({
+        decision: expect.stringContaining('Vue'),
+        status: 'confirmed',
+      }));
+
+      const rejectedOnly = analyzeConversation("Sarah: I don't agree, let's not go with React");
+      expect(rejectedOnly.decisions).toEqual([]);
+
+      const tentative = analyzeConversation("Sarah: Let's go with Vue if the client approves");
+      expect(tentative.decisions).toContainEqual(expect.objectContaining({
+        status: 'tentative',
+        decision: expect.not.stringMatching(/^\s/),
+      }));
+    });
+
+    it('keeps the affirmative choice after a separately negated clause', () => {
+      const result = analyzeConversation('Sarah: We are not going with React, going with Vue instead');
+      expect(result.decisions).toContainEqual(expect.objectContaining({
+        decision: expect.stringContaining('going with Vue'),
+      }));
+      expect(result.decisions[0].rejectedOptions).toContain('React');
+    });
+
+    it('marks tentative actions and does not assign them high confidence', () => {
+      const result = analyzeConversation('Alex: Maybe submit the form by Friday', 'Alex');
+      expect(result.actions[0]).toMatchObject({
+        assignee: 'Alex',
+        status: 'tentative',
+      });
+    });
+
+    it('labels ambiguous month-first numeric dates without changing their value', () => {
+      const result = analyzeConversation('Sarah: Deadline 05/12/2026');
+      expect(result.dates[0]).toMatchObject({
+        date: '05/12/2026',
+        note: 'Ambiguous DD/MM or MM/DD',
+      });
+    });
+
+    it('extracts short month-name dates and message dates without parsing time headers', () => {
+      const result = analyzeConversation(
+        '12/05/2024, 15:40 - Sarah: Exam on 15 Oct and Dec 10'
+      );
+      expect(result.dates.map((item) => item.date)).toEqual(['15 Oct', 'Dec 10']);
+      expect(result.dates.every((item) => !item.date.includes('12/05/2024'))).toBe(true);
+    });
+
+    it('rejects fractions with units and bare counts', () => {
+      const result = analyzeConversation(
+        'Sarah: look at 5 of these\nBob: recipe says 3/4 cup\nCara: open 24/7'
+      );
+      expect(result.dates).toEqual([]);
+    });
+
+    it('records message index, cues, and status on extracted items', () => {
+      const result = analyzeConversation('Sarah: hello\nSarah: Deadline is Friday');
+      expect(result.urgent[0]).toMatchObject({
+        messageIndex: 2,
+        matchedCues: expect.arrayContaining(['deadline']),
+        status: 'confirmed',
+      });
+      expect(result.dates[0]).toMatchObject({
+        messageIndex: 2,
+        status: 'confirmed',
+      });
+    });
+
+    it('warns when some lines cannot be attributed to a sender', () => {
+      const result = analyzeConversation('unrecognized header style\nSarah: hello\nSarah: bye');
+      expect(result.unparsedLineCount).toBe(1);
+      expect(result.totalLineCount).toBe(3);
+    });
+
+    it('recognizes dates in both numeric orders and preserves their exact source text', () => {
+      const result = analyzeConversation(
+        'Priya: Submit by 25/12/2026\nSarah: Fees due 13/05/2026\nBob: Deadline 12/25/2026\nCara: Deadline 05/13/2026'
+      );
+      expect(result.dates.map((date) => date.date)).toEqual([
+        '25/12/2026',
+        '13/05/2026',
+        '12/25/2026',
+        '05/13/2026',
+      ]);
+    });
+
+    it('uses counts rather than guessed topics or unsupported chat-quality claims in the summary', () => {
+      const result = analyzeConversation('Sarah: the report looks fine\nBob: that is legit\nCara: latest numbers are in');
+      expect(result.summary).not.toMatch(/report|repository|code|didn't miss much|substantive|discussing/i);
+      expect(result.summary).toMatch(/3 messages from 3 people/);
     });
 
     it('does not extract bare numbers, fractions, or 24/7 as dates', () => {

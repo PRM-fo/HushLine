@@ -8,6 +8,7 @@ interface ConversationInputProps {
   userName: string;
   onUserNameChange: (value: string) => void;
   onAnalyze: (text: string, scope?: string) => void;
+  onCancelAnalysis: () => void;
   onClear: () => void;
   isProcessing: boolean;
   error: string | null;
@@ -21,6 +22,7 @@ export function ConversationInput({
   userName,
   onUserNameChange,
   onAnalyze,
+  onCancelAnalysis,
   onClear,
   isProcessing,
   error,
@@ -82,7 +84,7 @@ export function ConversationInput({
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder="Paste your conversation here…&#10;&#10;Supported formats:&#10;Name: message text&#10;WhatsApp Android and iOS exports"
-              className="w-full h-56 sm:h-64 bg-transparent resize-none px-5 py-4 text-text-main placeholder-text-muted/80 focus:outline-none focus:ring-2 focus:ring-primary-300/80 focus:ring-offset-2 focus:ring-offset-midnight-950 rounded-xl text-sm leading-relaxed font-mono"
+              className="w-full h-56 sm:h-64 bg-transparent resize-none px-5 py-4 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-300/80 focus:ring-offset-2 focus:ring-offset-midnight-950 rounded-xl text-sm leading-relaxed font-mono"
               spellCheck={false}
               disabled={isProcessing}
               id="conversation-input"
@@ -202,6 +204,9 @@ export function ConversationInput({
             <div className="flex items-center gap-3">
               <Loader2 className="w-5 h-5 text-primary-300 animate-spin" />
               <span className="text-sm text-text-muted font-mono">Analyzing this input in the background…</span>
+              <button type="button" onClick={onCancelAnalysis} className="btn-ghost ml-auto">
+                Cancel analysis
+              </button>
             </div>
           </div>
         )}

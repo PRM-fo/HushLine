@@ -14,17 +14,17 @@ Group chats generate hundreds of messages daily. Most are casual noise, but crit
 
 ## Solution & Key Features
 
-- **Conversation Input**: Paste `Name: message` lines or WhatsApp Android timestamp-first and iOS bracketed exports. Optional username identifies tasks assigned to you.
+- **Conversation Input**: Paste supported `Name: message` lines or WhatsApp Android timestamp-first and iOS bracketed exports. Optional username helps identify tasks assigned to you. Other chat-export formats are not claimed as supported.
 - **Large pastes**: Inputs over 100,000 characters are preserved and can be analyzed one line-aware chunk at a time.
 - **The Briefing**: A structured dashboard with:
-  - **The Signal** — executive summary of the conversation
+  - **The Signal** — message, participant, and extracted-item counts
   - **Urgent** — time-sensitive messages with priority explanations
   - **Your Actions** — tasks assigned to you, with deadlines where available
   - **Decisions** — agreements and conclusions reached by the group
   - **Important Dates** — upcoming events, deadlines, and meetings
   - **Mentions** — messages that tag you or others
   - **What You Missed** — buried announcements easy to scroll past
-- **Source Verification**: Every extracted item includes the original message snippet as evidence.
+- **Source Evidence**: Extracted items include a message snippet, sender, and message index for review.
 - **Priority & Category Filtering**: Filter results by category and priority level.
 - **Copy to Clipboard**: Copy the full briefing or just your action items.
 - **Local analysis implementation**: The analyzer runs in the browser and this app does not implement a server-side analysis endpoint. Hosting and browser-level network behavior are not evaluated here.
@@ -107,6 +107,8 @@ Test cases include:
 - **Heuristic, not AI**: Hushline uses pattern-matching heuristics, not a language model. It may miss implicit or subtly phrased items. This is labeled honestly in the UI — confidence badges distinguish explicit facts from inferred interpretations.
 - **No semantic understanding**: The engine cannot understand context, sarcasm, or nuance the way a language model could.
 - **Format support**: Export formats other than the tested plain-text and WhatsApp forms are not claimed as supported.
+- **Parser warnings**: Unattributed input lines and skipped system/deleted-message lines are counted and reported in the briefing.
+- **Date ambiguity**: Numeric dates that can be interpreted in either day-first or month-first order are preserved as written and flagged as ambiguous.
 
 ## Deployment
 
@@ -158,4 +160,4 @@ This section accurately documents the AI tools used in building Hushline:
 
 ## License
 
-No license has been specified for this repository.
+This project is licensed under the MIT License; see [LICENSE](./LICENSE).

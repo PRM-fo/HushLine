@@ -262,6 +262,18 @@ export function Briefing({ result, userName, onReset, analysisScope }: BriefingP
             This briefing covers {analysisScope}. The full pasted conversation remains in the input.
           </p>
         )}
+        {(result.unparsedLineCount > 0 || result.ignoredSystemLineCount > 0) && (
+          <div className="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100" role="status" aria-live="polite">
+            {result.unparsedLineCount > 0 && (
+              <p>
+                {result.unparsedLineCount} of {result.totalLineCount} non-empty input lines could not be attributed to a sender; review the pasted text for unsupported formatting.
+              </p>
+            )}
+            {result.ignoredSystemLineCount > 0 && (
+              <p>{result.ignoredSystemLineCount} system or deleted-message lines were skipped.</p>
+            )}
+          </div>
+        )}
         {copyError && (
           <p className="mb-6 text-sm text-red-300" role="alert" aria-live="assertive">
             {copyError}

@@ -1,15 +1,27 @@
 export interface ParsedMessage {
   id: number;
+  messageIndex: number;
   sender: string;
   text: string;
   timestamp?: string;
   raw: string;
 }
 
+export type ItemStatus = 'confirmed' | 'tentative';
+
+interface EvidenceFields {
+  messageIndex: number;
+  matchedCues: string[];
+  status: ItemStatus;
+}
+
 export interface UrgentItem {
   id: string;
+  messageIndex: number;
   title: string;
   reason: string;
+  matchedCues: string[];
+  status: ItemStatus;
   snippet: string;
   sender: string;
   timestamp?: string;
@@ -18,6 +30,7 @@ export interface UrgentItem {
 
 export interface ActionItem {
   id: string;
+  messageIndex: number;
   task: string;
   assignee: string;
   assigneeIsUser: boolean;
@@ -26,17 +39,20 @@ export interface ActionItem {
   sender: string;
   timestamp?: string;
   confidence: 'explicit' | 'inferred';
+  matchedCues: string[];
+  status: ItemStatus;
 }
 
-export interface DecisionItem {
+export interface DecisionItem extends EvidenceFields {
   id: string;
   decision: string;
+  rejectedOptions: string[];
   snippet: string;
   sender: string;
   timestamp?: string;
 }
 
-export interface DateItem {
+export interface DateItem extends EvidenceFields {
   id: string;
   event: string;
   date: string;
@@ -44,9 +60,10 @@ export interface DateItem {
   snippet: string;
   sender: string;
   timestamp?: string;
+  note?: string;
 }
 
-export interface AnnouncementItem {
+export interface AnnouncementItem extends EvidenceFields {
   id: string;
   title: string;
   snippet: string;
@@ -55,7 +72,7 @@ export interface AnnouncementItem {
   buriedReason: string;
 }
 
-export interface MentionItem {
+export interface MentionItem extends EvidenceFields {
   id: string;
   mentionedUser: string;
   isUser: boolean;
@@ -68,6 +85,9 @@ export interface MentionItem {
 export interface BriefingResult {
   summary: string;
   messageCount: number;
+  totalLineCount: number;
+  ignoredSystemLineCount: number;
+  unparsedLineCount: number;
   participantCount: number;
   participants: string[];
   urgent: UrgentItem[];
@@ -77,6 +97,13 @@ export interface BriefingResult {
   announcements: AnnouncementItem[];
   mentions: MentionItem[];
   processedAt: string;
+}
+
+export interface ParseResult {
+  messages: ParsedMessage[];
+  ignoredSystemLineCount: number;
+  unparsedLineCount: number;
+  totalLineCount: number;
 }
 
 const URGENCY_MARKERS = [
@@ -147,6 +174,7 @@ const NON_DECISION_MARKERS = [
   /\buncertain\b/i,
   /\bdecided\s+against\b/i,
   /\b(?:reject(?:ed|ing)?|ruled out|vetoed)\b/i,
+  /\b(?:don't|do not|didn't|did not)\s+agree\b/i,
   /\b(?:don't|do not|didn't|did not|won't|will not)\s+(?:go with|choose|use|select|adopt)\b/i,
   /\b(?:not|never)\s+(?:go(?:ing)?|choose|use|select|adopt)\s+(?:with\s+)?\w+/i,
   /\?\s*$/m, // Ends with question mark
@@ -176,7 +204,7 @@ const CASUAL_MARKERS = [
 const DATE_PATTERNS: RegExp[] = [
   /\b(?:by|before|on|due|deadline(?:\s+is)?(?:\s+by)?)\s+(?:this\s+|next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
   /\b(?:by|before|on|due)\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi,
-  /\b(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?)\b/gi,
+  /\b(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?)(?:\s*,?\s*\d{4})?\b/gi,
   /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g,
   /\b(?:today|tomorrow|tonight|this (?:morning|afternoon|evening|week|weekend))\b/gi,
   /\bnext week\b/gi,
@@ -185,16 +213,77 @@ const DATE_PATTERNS: RegExp[] = [
   /\b\d{1,2}\s*(?:am|pm)\b/gi,
 ];
 
-const TIME_CHANGE_MARKERS = [
-  /\bmoved\b/i,
-  /\breschedul/i,
-  /\bchanged\b/i,
-  /\bnew time\b/i,
-  /\binstead of\b/i,
-  /\bnot at\b/i,
-  /\bnow at\b/i,
-  /\boriginally\b/i,
+const TENTATIVE_CUES = [
+  /\bmaybe\b/i,
+  /\bmight\b/i,
+  /\bperhaps\b/i,
+  /\bprobably\b/i,
+  /\bi think\b/i,
+  /\bnot sure\b/i,
+  /\btbd\b/i,
+  /\bif\b/i,
+  /\bshould we\b/i,
+  /\?/,
 ];
+
+const EXPLICIT_ACTION_CUES = [
+  /\bplease\b/i,
+  /\bneed(?:s)?\s+(?:you\s+)?to\b/i,
+  /\bassign(?:ed)?\b/i,
+  /\bcan you\b/i,
+  /\bcould you\b/i,
+];
+
+const SYSTEM_LINE_PATTERNS = [
+  /^<media omitted>$/i,
+  /^this message was deleted\.?$/i,
+  /^messages and calls are end-to-end encrypted/i,
+];
+
+const MESSAGE_LINE_FORMATS = [
+  {
+    pattern: /^(\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)\s+-\s+([^:]{1,50}):\s+(.+)$/i,
+    map: (match: RegExpMatchArray) => ({
+      sender: match[2].trim(),
+      timestamp: match[1].trim(),
+      text: match[3].trim(),
+    }),
+  },
+  {
+    pattern: /^\[(\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)\]\s+([^:]{1,50}):\s+(.+)$/i,
+    map: (match: RegExpMatchArray) => ({
+      sender: match[2].trim(),
+      timestamp: match[1].trim(),
+      text: match[3].trim(),
+    }),
+  },
+  {
+    pattern: /^([^\s,][^,]{0,50}?),\s+(\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)\s*[-–]\s+(.+)$/i,
+    map: (match: RegExpMatchArray) => ({
+      sender: match[1].trim(),
+      timestamp: match[2].trim(),
+      text: match[3].trim(),
+    }),
+  },
+  {
+    pattern: /^([^:]{1,80}?)\s*(?:\[(.*?)\]|\((.*?)\))?\s*:\s+(.+)$/,
+    map: (match: RegExpMatchArray) => ({
+      sender: match[1].trim(),
+      timestamp: match[2] || match[3] || undefined,
+      text: match[4].trim(),
+    }),
+  },
+] satisfies Array<{
+  pattern: RegExp;
+  map: (match: RegExpMatchArray) => { sender: string; timestamp?: string; text: string };
+}>;
+
+const NAME_LABEL_PATTERN = /^[\p{L}\p{M}\p{N}]+(?:[ '\u2019-][\p{L}\p{M}\p{N}]+){0,2}$/u;
+const SYSTEM_TIMESTAMP_PATTERN =
+  /^\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\s+-\s+(.+)$/i;
+const INLINE_TIMESTAMP_PATTERN =
+  /^\[(?:\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+)?\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\]\s*/i;
+const MEDIA_MESSAGE_PATTERN = /^(?:<media omitted>|this message was deleted\.?)$/i;
 
 let idCounter = 0;
 const nextId = () => `item_${++idCounter}`;
@@ -206,113 +295,129 @@ const nextId = () => `item_${++idCounter}`;
  * and plain lines.
  * Supports Unicode sender names.
  */
-export function parseMessages(raw: string): ParsedMessage[] {
+export function parseConversation(raw: string): ParseResult {
   const lines = raw
     .split('\n')
     .map((line) => line.replace(/^[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]+/, '').trim())
     .filter(Boolean);
   const messages: ParsedMessage[] = [];
+  const labelCounts = new Map<string, number>();
+  const seenSenders = new Set<string>();
+  for (const line of lines) {
+    const match = line.match(/^([^:]{1,80}):\s*(.*)$/);
+    if (match && NAME_LABEL_PATTERN.test(match[1].trim())) {
+      const label = match[1].trim().toLocaleLowerCase();
+      labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+    }
+  }
   let currentSender = '';
-  let currentText = '';
   let currentTimestamp: string | undefined;
   let buffer: string[] = [];
+  let rawBuffer: string[] = [];
+  let ignoredSystemLineCount = 0;
+  let unparsedLineCount = 0;
 
   const flushBuffer = () => {
     if (buffer.length > 0 && currentSender) {
       messages.push({
         id: messages.length + 1,
+        messageIndex: messages.length + 1,
         sender: currentSender,
-        text: buffer.join(' '),
+        text: buffer.join('\n'),
         timestamp: currentTimestamp,
-        raw: `${currentSender}: ${buffer.join(' ')}`,
+        raw: rawBuffer.join('\n'),
       });
       buffer = [];
+      rawBuffer = [];
     }
   };
 
-  // Pattern: "Name: message" or "Name [timestamp]: message" or "Name (timestamp): message"
-  // Supports Unicode characters in sender names
-  const senderLinePattern = /^([^\s:][^:]{0,50}?)\s*(?:\[(.*?)\]|\((.*?)\))?\s*:\s+(.+)$/;
-  // WhatsApp Android: "date, time - Name: message"
-  const whatsappAndroidPattern = /^(\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)\s+-\s+([^:]{1,50}):\s+(.+)$/i;
-  // Older WhatsApp Android exports: "Name, date, time - message"
-  const legacyWhatsappAndroidPattern = /^([^\s,][^,]{0,50}?),\s+(\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)\s*[-–]\s+(.+)$/i;
-  // WhatsApp iOS: "[date, time] Name: message"
-  const whatsappIosPattern = /^\[(\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)\]\s+([^:]{1,50}):\s+(.+)$/i;
-  const reservedSenderPattern = /^(?:step\s+one|todo|deadline)$/i;
-
   for (const line of lines) {
-    const waAndroidMatch = line.match(whatsappAndroidPattern);
-    const waIosMatch = line.match(whatsappIosPattern);
-    const legacyWaAndroidMatch = !waAndroidMatch && !waIosMatch
-      ? line.match(legacyWhatsappAndroidPattern)
-      : null;
-    const smMatch = !waAndroidMatch && !waIosMatch && !legacyWaAndroidMatch
-      ? line.match(senderLinePattern)
-      : null;
+    const formatMatch = MESSAGE_LINE_FORMATS
+      .map((format) => ({ format, match: line.match(format.pattern) }))
+      .find((entry) => entry.match);
+    const parsed = formatMatch?.match ? formatMatch.format.map(formatMatch.match) : null;
+    const isTimestampedFormat = formatMatch !== undefined &&
+      formatMatch.format !== MESSAGE_LINE_FORMATS[MESSAGE_LINE_FORMATS.length - 1];
 
-    if (waAndroidMatch) {
-      flushBuffer();
-      currentTimestamp = waAndroidMatch[1].trim();
-      currentSender = waAndroidMatch[2].trim();
-      currentText = waAndroidMatch[3].trim();
-      messages.push({
-        id: messages.length + 1,
-        sender: currentSender,
-        text: currentText,
-        timestamp: currentTimestamp,
-        raw: line,
-      });
-      buffer = [];
-    } else if (waIosMatch) {
-      flushBuffer();
-      currentTimestamp = waIosMatch[1].trim();
-      currentSender = waIosMatch[2].trim();
-      currentText = waIosMatch[3].trim();
-      messages.push({
-        id: messages.length + 1,
-        sender: currentSender,
-        text: currentText,
-        timestamp: currentTimestamp,
-        raw: line,
-      });
-      buffer = [];
-    } else if (legacyWaAndroidMatch) {
-      flushBuffer();
-      currentSender = legacyWaAndroidMatch[1].trim();
-      currentTimestamp = legacyWaAndroidMatch[2].trim();
-      currentText = legacyWaAndroidMatch[3].trim();
-      messages.push({
-        id: messages.length + 1,
-        sender: currentSender,
-        text: currentText,
-        timestamp: currentTimestamp,
-        raw: line,
-      });
-      buffer = [];
-    } else if (smMatch && reservedSenderPattern.test(smMatch[1].trim())) {
+    if (parsed && isSystemMessage(parsed.text)) {
       flushBuffer();
       currentSender = '';
       currentTimestamp = undefined;
-      messages.push({
-        id: messages.length + 1,
-        sender: 'Unknown',
-        text: line,
-        raw: line,
-      });
-    } else if (smMatch) {
+      ignoredSystemLineCount += 1;
+      continue;
+    }
+
+    if (parsed) {
+      const normalizedLabel = parsed.sender.toLocaleLowerCase();
+      const startsLikeTimestamp = INLINE_TIMESTAMP_PATTERN.test(parsed.sender);
+      const isPlausibleSender = NAME_LABEL_PATTERN.test(parsed.sender);
+      const isKnownSender = seenSenders.has(normalizedLabel);
+      const appearsRepeated = (labelCounts.get(normalizedLabel) ?? 0) >= 2;
+      const isSingleName = (isUncasedWord(parsed.sender) ||
+        /^[\p{Lu}][\p{Ll}\p{M}'\u2019-]*$/u.test(parsed.sender)) &&
+        !/^(?:\d{1,2}(?:st|nd|rd|th)?\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{1,2}(?:st|nd|rd|th)?)\b/i.test(parsed.text);
+
+      if (!isTimestampedFormat && !startsLikeTimestamp &&
+        (!isPlausibleSender || (!isKnownSender && !appearsRepeated && !isSingleName))) {
+        if (currentSender) {
+          buffer.push(line);
+          rawBuffer.push(line);
+        } else {
+          unparsedLineCount += 1;
+          messages.push({
+            id: messages.length + 1,
+            messageIndex: messages.length + 1,
+            sender: 'Unknown',
+            text: line,
+            raw: line,
+          });
+        }
+        continue;
+      }
+
+      if (MEDIA_MESSAGE_PATTERN.test(parsed.text)) {
+        flushBuffer();
+        currentSender = '';
+        currentTimestamp = undefined;
+        ignoredSystemLineCount += 1;
+        continue;
+      }
+
       flushBuffer();
-      currentSender = smMatch[1].trim();
-      currentTimestamp = smMatch[2] || smMatch[3] || undefined;
-      currentText = smMatch[4].trim();
-      buffer = [currentText];
-    } else if (currentSender) {
-      // Continuation of previous message
+      currentSender = parsed.sender;
+      currentTimestamp = parsed.timestamp;
+      seenSenders.add(normalizedLabel);
+      buffer = [parsed.text];
+      rawBuffer = [line];
+      continue;
+    }
+
+    const timestampSystemMatch = line.match(SYSTEM_TIMESTAMP_PATTERN);
+    if (timestampSystemMatch && !/^[^:]{1,80}:\s+/.test(timestampSystemMatch[1])) {
+      flushBuffer();
+      currentSender = '';
+      currentTimestamp = undefined;
+      ignoredSystemLineCount += 1;
+      continue;
+    }
+
+    if (isSystemMessage(line)) {
+      flushBuffer();
+      currentSender = '';
+      currentTimestamp = undefined;
+      ignoredSystemLineCount += 1;
+      continue;
+    }
+
+    if (currentSender) {
       buffer.push(line);
+      rawBuffer.push(line);
     } else {
-      // No sender detected — treat as anonymous
+      unparsedLineCount += 1;
       messages.push({
         id: messages.length + 1,
+        messageIndex: messages.length + 1,
         sender: 'Unknown',
         text: line,
         raw: line,
@@ -321,7 +426,24 @@ export function parseMessages(raw: string): ParsedMessage[] {
   }
   flushBuffer();
 
-  return messages;
+  return {
+    messages,
+    ignoredSystemLineCount,
+    unparsedLineCount,
+    totalLineCount: lines.length,
+  };
+}
+
+function isSystemMessage(text: string): boolean {
+  return SYSTEM_LINE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function isUncasedWord(value: string): boolean {
+  return !/[\p{Lu}\p{Ll}]/u.test(value) && /^[\p{L}\p{M}'\u2019-]+$/u.test(value);
+}
+
+export function parseMessages(raw: string): ParsedMessage[] {
+  return parseConversation(raw).messages;
 }
 
 function extractDates(text: string): string[] {
@@ -337,8 +459,10 @@ function extractDates(text: string): string[] {
         const month = first > 12 ? second : first;
         const year = yearText === undefined ? 2000 : yearText < 100 ? yearText + 2000 : yearText;
         if (month < 1 || month > 12 || day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate()) continue;
-        if (/\b(?:fraction|ratio|divided by|out of)\b/i.test(text)) continue;
+        const context = text.slice(Math.max(0, match.index - 24), match.index + value.length + 24);
+        if (/\b(?:fraction|ratio|divided by|out of|recipe|cup|cups|portion|parts?)\b/i.test(context)) continue;
       }
+      if (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value) && /\b(?:cup|cups|portion|parts?)\b/i.test(text.slice(match.index + value.length))) continue;
       found.push(value);
     }
   }
@@ -353,16 +477,23 @@ function extractDates(text: string): string[] {
   );
 }
 
+function isTentative(text: string): boolean {
+  return TENTATIVE_CUES.some((cue) => cue.test(text));
+}
+
+function matchedCues(text: string, patterns: RegExp[]): string[] {
+  return patterns.flatMap((pattern) => {
+    const match = text.match(pattern);
+    return match?.[0] ? [match[0].trim().toLocaleLowerCase()] : [];
+  });
+}
+
 function isCasual(text: string): boolean {
   return CASUAL_MARKERS.some((p) => p.test(text));
 }
 
 function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(text));
-}
-
-function containsNonDecision(text: string): boolean {
-  return NON_DECISION_MARKERS.some((p) => p.test(text));
 }
 
 function highlightSnippet(message: ParsedMessage, keyword?: string): string {
@@ -392,7 +523,7 @@ function findNameDirectedAssignee(text: string, names: string[]): string | undef
 
   for (const name of candidates) {
     const pattern = new RegExp(
-      `^\\s*(?:please\\s*,?\\s+)?@?${escapeRegExp(name)}(?:,\\s*|\\s+)(?:please\\s+)?${TASK_VERB_SOURCE}\\b`,
+      `^\\s*(?:@?${escapeRegExp(name)}(?:\\s*,\\s*|\\s+)(?:(?:can|could)\\s+you\\s+|please\\s+)?|please\\s*,\\s*@?${escapeRegExp(name)}\\s*,\\s*)(?:please\\s+)?${TASK_VERB_SOURCE}\\b`,
       'iu'
     );
     if (pattern.test(text)) return name;
@@ -400,69 +531,24 @@ function findNameDirectedAssignee(text: string, names: string[]): string | undef
   return undefined;
 }
 
-function summarizeMessages(messages: ParsedMessage[], participants: string[]): string {
-  const nonCasual = messages.filter((m) => !isCasual(m.text));
-  const total = messages.length;
-  const noiseCount = total - nonCasual.length;
+function getDecisionClauses(text: string): Array<{ decision: string; rejectedOptions: string[]; status: ItemStatus }> {
+  const clauses = text.split(/[,;]|\bbut\b/i).map((clause) => clause.trim()).filter(Boolean);
+  const rejectedOptions = [...text.matchAll(
+    /\b(?:not going with|not to go with|decided against|rejected|ruled out|vetoed)\s+([^,.!?]+)/gi
+  )].map((match) => match[1].trim());
+  const decisions: Array<{ decision: string; rejectedOptions: string[]; status: ItemStatus }> = [];
+  for (const clause of clauses) {
+    const rejected = NON_DECISION_MARKERS.some((pattern) => pattern.test(clause)) ||
+      /\b(?:not|never)\s+(?:going|go|choose|use|select|adopt)\b/i.test(clause);
+    if (rejected || !matchesAny(clause, DECISION_MARKERS)) continue;
 
-  const topics: string[] = [];
-
-  // Detect topic keywords from non-casual messages
-  const topicWords = nonCasual
-    .map((m) => m.text.toLowerCase())
-    .join(' ');
-
-  if (/\bpresent(?:ation)?\b/i.test(topicWords)) topics.push('a presentation');
-  if (/\bmeeting\b/i.test(topicWords)) topics.push('an upcoming meeting');
-  if (/\bdeadline\b/i.test(topicWords)) topics.push('a deadline');
-  if (/\bsubmi(?:ssion|t)\b/i.test(topicWords)) topics.push('a submission');
-  if (/\bproject\b/i.test(topicWords)) topics.push('the project');
-  if (/\bexam\b|\bquiz\b|\btest\b/i.test(topicWords)) topics.push('an exam');
-  if (/\bslide/i.test(topicWords)) topics.push('slides');
-  // Removed overly broad "report" pattern - too many false positives
-  if (/\bcode\b|\brepo\b|\bgithub\b/i.test(topicWords)) topics.push('code/repository work');
-  if (/\bgrade|grading|rubric/i.test(topicWords)) topics.push('grading details');
-
-  const topicStr =
-    topics.length > 0
-      ? topics.slice(0, 4).join(', ')
-      : 'the ongoing discussion';
-
-  const participantStr =
-    participants.length <= 3
-      ? participants.join(', ')
-      : `${participants.slice(0, 3).join(', ')} and ${participants.length - 3} other${participants.length - 3 > 1 ? 's' : ''}`;
-
-  let summary = `This conversation involves ${participantStr} discussing ${topicStr}. `;
-
-  if (noiseCount > total * 0.3) {
-    summary += `About ${Math.round((noiseCount / total) * 100)}% of the ${total} messages are casual chatter — you didn't miss much by skipping them. `;
-  } else {
-    summary += `Out of ${total} messages, most contain substantive content. `;
+    decisions.push({
+      decision: clause,
+      rejectedOptions: [...rejectedOptions],
+      status: isTentative(clause) ? 'tentative' : 'confirmed',
+    });
   }
-
-  // Add key highlights
-  const highlights: string[] = [];
-  if (nonCasual.some((m) => TIME_CHANGE_MARKERS.some((p) => p.test(m.text)))) {
-    highlights.push('a schedule change');
-  }
-  if (nonCasual.some((m) => /\bdeadline\b/i.test(m.text))) {
-    highlights.push('a deadline');
-  }
-  if (nonCasual.some((m) => DECISION_MARKERS.some((p) => p.test(m.text)))) {
-    highlights.push('a group decision');
-  }
-  if (nonCasual.some((m) => /\bFYI\b|heads? up|announcement|professor/i.test(m.text))) {
-    highlights.push('an important announcement');
-  }
-
-  if (highlights.length > 0) {
-    summary += `The key things to know: ${highlights.join(', ')}. `;
-  }
-
-  summary += "Details are organized by category below — start with Urgent if you're short on time.";
-
-  return summary;
+  return decisions;
 }
 
 export function analyzeConversation(
@@ -470,7 +556,8 @@ export function analyzeConversation(
   userName?: string
 ): BriefingResult {
   idCounter = 0;
-  const messages = parseMessages(raw);
+  const parsedConversation = parseConversation(raw);
+  const messages = parsedConversation.messages;
   const participants = [...new Set(messages.map((m) => m.sender))];
   const userLower = userName?.trim().toLowerCase();
 
@@ -501,8 +588,11 @@ export function analyzeConversation(
         seenUrgent.add(key);
         urgent.push({
           id: nextId(),
+          messageIndex: msg.messageIndex,
           title: text.length > 120 ? text.slice(0, 117) + '…' : text,
           reason: 'Contains time-sensitive or urgent language',
+          matchedCues: matchedCues(text, URGENCY_MARKERS),
+          status: isTentative(text) ? 'tentative' : 'confirmed',
           snippet: highlightSnippet(msg),
           sender: msg.sender,
           timestamp: msg.timestamp,
@@ -531,7 +621,7 @@ export function analyzeConversation(
           assigneeIsUser = userLower ? msg.sender.toLowerCase() === userLower : false;
         } else {
           const nameDirectedAssignee = findNameDirectedAssignee(text, [...participants, userName ?? '']);
-          const senderTaskMatch = new RegExp(`^\\s*(?:please\\s+)?${TASK_VERB_SOURCE}\\b`, 'i').test(text);
+          const senderTaskMatch = new RegExp(`^\\s*(?:(?:please|maybe)\\s+)?${TASK_VERB_SOURCE}\\b`, 'i').test(text);
           if (nameDirectedAssignee) {
             assignee = nameDirectedAssignee;
             assigneeIsUser = userLower ? assignee.toLowerCase() === userLower : false;
@@ -551,6 +641,7 @@ export function analyzeConversation(
             seenAction.add(key);
             actions.push({
               id: nextId(),
+              messageIndex: msg.messageIndex,
               task: text.length > 150 ? text.slice(0, 147) + '…' : text,
               assignee,
               assigneeIsUser,
@@ -558,9 +649,11 @@ export function analyzeConversation(
               snippet: highlightSnippet(msg),
               sender: msg.sender,
               timestamp: msg.timestamp,
-              confidence: actionMatch.source.includes('please') || actionMatch.source.includes('need') || actionMatch.source.includes('assign')
+              confidence: EXPLICIT_ACTION_CUES.some((cue) => cue.test(text))
                 ? 'explicit'
                 : 'inferred',
+              matchedCues: matchedCues(text, ACTION_VERBS),
+              status: isTentative(text) ? 'tentative' : 'confirmed',
             });
           }
         }
@@ -568,23 +661,23 @@ export function analyzeConversation(
     }
 
     // --- DECISIONS ---
-    if (!casual && matchesAny(text, DECISION_MARKERS) && !containsNonDecision(text)) {
+    if (!casual && matchesAny(text, DECISION_MARKERS)) {
       const key = text.slice(0, 60);
       if (!seenDecision.has(key)) {
         seenDecision.add(key);
-        // Try to extract the actual decision
-        let decisionText = text;
-        const goWithMatch = text.match(/(?:let'?s go with|we'?l+ go with|going with|we chose|decided\s+(?:on|to)\s+(?:go with\s+)?)(.+)/i);
-        if (goWithMatch) {
-          decisionText = goWithMatch[1];
+        for (const clause of getDecisionClauses(text)) {
+          decisions.push({
+            id: nextId(),
+            messageIndex: msg.messageIndex,
+            decision: clause.decision.length > 150 ? clause.decision.slice(0, 147) + '…' : clause.decision,
+            rejectedOptions: clause.rejectedOptions,
+            matchedCues: matchedCues(text, DECISION_MARKERS),
+            status: clause.status,
+            snippet: highlightSnippet(msg),
+            sender: msg.sender,
+            timestamp: msg.timestamp,
+          });
         }
-        decisions.push({
-          id: nextId(),
-          decision: decisionText.length > 150 ? decisionText.slice(0, 147) + '…' : decisionText,
-          snippet: highlightSnippet(msg),
-          sender: msg.sender,
-          timestamp: msg.timestamp,
-        });
       }
     }
 
@@ -602,29 +695,45 @@ export function analyzeConversation(
 
         dates.push({
           id: nextId(),
+          messageIndex: msg.messageIndex,
+          matchedCues: matchedCues(text, DATE_PATTERNS),
+          status: isTentative(text) ? 'tentative' : 'confirmed',
           event,
           date: dateStr,
           type,
           snippet: highlightSnippet(msg),
           sender: msg.sender,
           timestamp: msg.timestamp,
+          note: /^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(dateStr) &&
+            Number(dateStr.split('/')[0]) <= 12 &&
+            Number(dateStr.split('/')[1]) <= 12
+            ? 'Ambiguous DD/MM or MM/DD'
+            : undefined,
         });
       }
     }
 
     // --- MENTIONS ---
-    if (hasMention) {
-      const mentionMatches = text.matchAll(/@(\w+)/g);
-      for (const m of mentionMatches) {
-        const mentioned = m[1];
+    const mentionNames = [
+      ...[...text.matchAll(/@(\w+)/g)].map((match) => match[1]),
+      ...participants
+        .filter((name) => name.toLowerCase() !== msg.sender.toLowerCase())
+        .filter((name) => new RegExp(`\\b${escapeRegExp(name)}\\s*,`, 'iu').test(text))
+        .filter((name) => !new RegExp(`@${escapeRegExp(name)}\\b`, 'iu').test(text)),
+    ];
+    if (mentionNames.length > 0) {
+      for (const mentioned of new Set(mentionNames)) {
         const isUser = userLower ? mentioned.toLowerCase() === userLower : false;
         const key = mentioned + text.slice(0, 40);
         if (!seenMention.has(key)) {
           seenMention.add(key);
           mentions.push({
             id: nextId(),
+            messageIndex: msg.messageIndex,
             mentionedUser: mentioned,
             isUser,
+            matchedCues: [`${mentioned},`],
+            status: isTentative(text) ? 'tentative' : 'confirmed',
             context: text.length > 120 ? text.slice(0, 117) + '…' : text,
             snippet: highlightSnippet(msg, mentioned),
             sender: msg.sender,
@@ -641,7 +750,10 @@ export function analyzeConversation(
       if (!isAlreadyUrgent) {
         announcements.push({
           id: nextId(),
+          messageIndex: msg.messageIndex,
           title: text.length > 120 ? text.slice(0, 117) + '…' : text,
+          matchedCues: matchedCues(text, ANNOUNCEMENT_MARKERS),
+          status: isTentative(text) ? 'tentative' : 'confirmed',
           snippet: highlightSnippet(msg),
           sender: msg.sender,
           timestamp: msg.timestamp,
@@ -660,11 +772,17 @@ export function analyzeConversation(
   // Put mentions of the user first
   mentions.sort((a, b) => (a.isUser === b.isUser ? 0 : a.isUser ? -1 : 1));
 
-  const summary = summarizeMessages(messages, participants);
+  const summary =
+    `Analyzed ${messages.length} messages from ${participants.length} people (${participants.join(', ')}). ` +
+    `Found ${urgent.length} urgent items, ${actions.length} tasks, ${decisions.length} decisions, ` +
+    `${dates.length} dates, ${mentions.length} mentions and ${announcements.length} announcements.`;
 
   return {
     summary,
     messageCount: messages.length,
+    totalLineCount: parsedConversation.totalLineCount,
+    ignoredSystemLineCount: parsedConversation.ignoredSystemLineCount,
+    unparsedLineCount: parsedConversation.unparsedLineCount,
     participantCount: participants.length,
     participants,
     urgent,
