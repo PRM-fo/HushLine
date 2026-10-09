@@ -24,5 +24,26 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
     },
+  },
+  {
+    files: ['src/core/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'react', message: 'Core modules must remain framework-independent.' },
+            { name: 'react-dom', message: 'Core modules must remain framework-independent.' },
+            { name: 'lucide-react', message: 'Core modules must remain framework-independent.' },
+          ],
+          patterns: [
+            {
+              group: ['@/components/**', '../components/**', './components/**'],
+              message: 'Core modules must not import presentation components.',
+            },
+          ],
+        },
+      ],
+    },
   }
 );
