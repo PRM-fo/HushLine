@@ -300,7 +300,7 @@ export function Briefing({ result, userName, onReset, analysisScope }: BriefingP
             </div>
             <button
               onClick={copySummary}
-              className="flex items-center gap-1.5 text-xs text-text-muted hover:text-primary-300 transition-colors"
+              className="flex min-h-[44px] items-center gap-1.5 text-xs text-text-muted hover:text-primary-300 transition-colors sm:min-h-0"
               aria-label="Copy full briefing to clipboard"
             >
               {copiedSummary ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}

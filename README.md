@@ -31,7 +31,7 @@ Group chats generate hundreds of messages daily. Most are casual noise, but crit
 - **Source network behavior**: Analysis runs in the browser; no network calls are present in the application source. This does not verify third-party hosting behavior or browser extensions.
 - **No Fake Data**: The app starts with a genuinely empty state. All results are derived from the actual conversation you paste — no pre-populated content, no fabricated statistics.
 
-## Tech Stack & Architecture
+## Tech Stack
 
 - **React 18** + **TypeScript** — UI framework with full type safety
 - **Vite** — build tool and dev server
@@ -40,7 +40,7 @@ Group chats generate hundreds of messages daily. Most are casual noise, but crit
 - **Vitest** — unit testing
 - **No backend** — entirely client-side application
 
-### Architecture
+## Architecture
 
 ```
 src/
@@ -58,7 +58,14 @@ src/
 └── index.css                    # Global styles, design tokens, reduced-motion support
 ```
 
-The analyzer (`src/lib/analyzer.ts`) is fully decoupled from presentation. It parses raw text into messages, then applies heuristic pattern matching to identify urgency markers, action verbs, decision language, dates/times, announcements, and @mentions. It does not use any AI/ML model — it uses transparent, auditable regex-based heuristics.
+```text
+Pasted input -> line-aware chunking -> Web Worker parser -> heuristic extractors
+             -> briefing result -> React UI / user-triggered clipboard copy
+```
+
+The analyzer (`src/lib/analyzer.ts`) is decoupled from presentation. It parses raw text into messages, then applies heuristic pattern matching to identify urgency markers, action verbs, decision language, dates/times, announcements, and @mentions. It does not use an AI/ML model; it uses transparent, auditable pattern matching.
+
+There is no backend so pasted text can be analyzed in the browser without sending it to an app server, and there is no backend service to operate or pay for. Client-side processing can work offline when the app and worker assets are available locally, though offline use across reloads is not guaranteed. The trade-off is that conversations do not sync across devices.
 
 ## Setup & Local Development
 
@@ -110,6 +117,20 @@ Test cases include:
 - **Parser warnings**: Unattributed input lines and skipped system/deleted-message lines are counted and reported in the briefing.
 - **Date ambiguity**: Numeric dates that can be interpreted in either day-first or month-first order are preserved as written and flagged as ambiguous.
 
+## Security & Threat Model
+
+- **Processed:** Pasted conversation text is sent to the app's Web Worker for parsing and heuristic analysis in the browser.
+- **Rendered:** Results are rendered as React text; the app source does not use `innerHTML` to render conversation content.
+- **Stored:** The app does not persist conversation text or analysis results; they remain in page memory for the current session.
+- **Network:** No app network-request calls were observed in the source. This is a source review, not a live traffic measurement.
+- **Unverified:** Hosting-provider logs and infrastructure behavior are outside the app source and have not been verified.
+
+## Performance
+
+Analysis runs in a Web Worker, and result lists render 50 items at a time with a control to show more. The production build's main JavaScript bundle is about 58 KB gzipped; the analyzer worker is emitted as a separate asset.
+
+Analyzer-only Node measurements on synthetic inputs, using seven runs per input and reporting the median: 100 messages (~11.9 KB) took about 3.5 ms; 1,500 messages (~178.5 KB) took about 39.6 ms; and a dense 100,000-character input (~841 lines) took about 23.3 ms. These are machine- and runtime-dependent timings, not browser or end-to-end UI measurements.
+
 ## Deployment
 
 ### Deploy to Netlify
@@ -151,12 +172,8 @@ git push -u origin main
 
 ## Generative AI Usage
 
-This section accurately documents the AI tools used in building Hushline:
-
-- **Bolt.new**: Used to generate the initial project scaffold and the majority of the application code, including the analyzer engine, React components, styling, and tests. Bolt.new uses AI-assisted code generation.
-- **Devin**: Used for code inspection, auditing, and improvements including removing unused dependencies, updating metadata, and preparing the repository for hackathon submission.
+Repository history includes commits marked as generated with **Devin** and commits with a **Copilot** co-author trailer. Those commit records do not establish the exact scope of either tool's contribution.
 - **No model integration in the analyzer**: Conversation analysis is implemented with deterministic heuristic pattern matching in the browser.
-- **AI contribution**: Bolt.new's AI assistant contributed the full application architecture, the heuristic extraction patterns, the UI design system, and all React/TypeScript implementation. Devin assisted with code review and improvements. The human developer reviewed, tested, and refined the output.
 
 ## License
 

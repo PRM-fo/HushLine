@@ -787,6 +787,123 @@ describe('analyzeConversation — edge cases', () => {
       expect(result.decisions.every((item) => item.decision.trim().length > 0)).toBe(true);
     });
 
+    it('drops only superseded dates from deadline-change messages', () => {
+      const cases = [
+        ['Sam: Submission deadline moved from Thursday to Wednesday 5 PM.', 'Wednesday 5 PM'],
+        ['Sam: The deadline changed from Thursday to Wednesday at 5 PM.', 'Wednesday at 5 PM'],
+        ['Sam: The deadline was pushed from Friday to Monday at 9 AM.', 'Monday at 9 AM'],
+        ['Sam: The meeting shifted from Thursday to Wednesday at 11 AM.', 'Wednesday at 11 AM'],
+        ['Sam: The deadline was rescheduled from Thursday to Wednesday 5 PM.', 'Wednesday 5 PM'],
+        ['Sam: The deadline was postponed from Thursday to Wednesday 5 PM.', 'Wednesday 5 PM'],
+        ['Sam: It is now due Wednesday 5 PM instead of Thursday.', 'Wednesday 5 PM'],
+      ];
+
+      for (const [message, currentDate] of cases) {
+        const result = analyzeConversation(message);
+        expect(result.dates.map((item) => item.date), message).toContain(currentDate);
+        expect(result.dates.map((item) => item.date), message).not.toContain('Thursday');
+        expect(result.dates.map((item) => item.date), message).not.toContain('Friday');
+      }
+
+      const unrelated = analyzeConversation(
+        'Sam: The old meeting was Thursday.\nPriya: Submission deadline moved from Thursday to Wednesday 5 PM.'
+      );
+      expect(unrelated.dates.map((item) => item.date)).toContain('Thursday');
+      expect(unrelated.dates.map((item) => item.date)).toContain('Wednesday 5 PM');
+    });
+
+    it('assigns explicit ownership and responsibility phrases to the evidenced person', () => {
+      const cases = [
+        ['Rahul: I own the sponsorship presentation and logo upload.', 'Rahul', 'sponsorship presentation and logo upload'],
+        ["Sam: I'll handle the booking.", 'Sam', 'booking'],
+        ["Sam: I'm responsible for the poster design.", 'Sam', 'poster design'],
+        ["Sam: I'll take care of the venue booking.", 'Sam', 'venue booking'],
+        ["Sam: I'm taking the poster design.", 'Sam', 'poster design'],
+        ['Alex: Sam will confirm the auditorium booking.', 'Sam', 'confirm the auditorium booking'],
+        ['Sam: Priya is responsible for fixing the registration bug.', 'Priya', 'fixing the registration bug'],
+      ];
+
+      for (const [message, assignee, task] of cases) {
+        const result = analyzeConversation(message);
+        expect(result.actions).toContainEqual(expect.objectContaining({ assignee, task }));
+      }
+      expect(analyzeConversation('Sam: Everyone will confirm the booking.').actions).toEqual([]);
+      expect(analyzeConversation('Sam: They are responsible for fixing the bug.').actions).toEqual([]);
+    });
+
+    it('marks suggested and unconfirmed items tentative without weakening real decisions', () => {
+      const cases: Array<[string, RegExp]> = [
+        ['Sam: The live leaderboard is only a suggestion.', /live leaderboard/i],
+        ['Sam: Poster quantity is not confirmed.', /poster quantity.*not confirmed/i],
+        ['Sam: The live leaderboard is just an idea.', /live leaderboard.*idea/i],
+        ['Sam: The poster design is not final.', /poster design.*not final/i],
+        ['Sam: The launch date is TBD.', /launch date.*TBD/i],
+        ['Sam: The venue is yet to be confirmed.', /venue.*yet to be confirmed/i],
+        ['Sam: We have not decided on the poster quantity.', /not decided.*poster quantity/i],
+      ];
+
+      for (const [message, decisionPattern] of cases) {
+        const result = analyzeConversation(message);
+        expect(result.decisions.some((item) =>
+          item.status === 'tentative' && decisionPattern.test(item.decision)
+        ), message).toBe(true);
+      }
+
+      expect(analyzeConversation('Sam: We decided to go with React.').decisions[0]?.status).toBe('confirmed');
+      expect(analyzeConversation("Sam: I don't agree; let's not go with React.").decisions[0]?.status).toBe('confirmed');
+      expect(analyzeConversation('Sam: Should we use React?').decisions).toEqual([]);
+    });
+
+    it('requires a deadline or event cue before treating relative days as dates or urgency', () => {
+      for (const message of [
+        'Sam: The weather is nice today.',
+        'Priya: Thanks everyone, see you today',
+        'Sam: We can talk tomorrow.',
+        'Sam: I feel tired tonight.',
+      ]) {
+        const result = analyzeConversation(message);
+        expect(result.dates, message).toEqual([]);
+        expect(result.urgent, message).toEqual([]);
+      }
+
+      for (const message of [
+        'Sam: The report is due today.',
+        'Sam: Please send the report by tonight.',
+        'Sam: Meeting tomorrow at 11 AM.',
+        'Sam: Advance payment due tomorrow at noon.',
+        'Sam: I will send the report today.',
+      ]) {
+        expect(analyzeConversation(message).dates.length, message).toBeGreaterThan(0);
+      }
+    });
+
+    it('does not extract dates, urgency, or actions from unattributed lines after unsupported headers', () => {
+      for (const input of [
+        'Priya  9:15 PM\nI will fix it by 4 PM',
+        'Priya, [12.10.2026 21:15]\nDeadline is tomorrow and please submit it ASAP',
+      ]) {
+        const result = analyzeConversation(input);
+        expect(result.unparsedLineCount).toBeGreaterThan(0);
+        expect(result.dates).toEqual([]);
+        expect(result.urgent).toEqual([]);
+        expect(result.actions).toEqual([]);
+        expect(formatUnparsedLineWarning(result.unparsedLineCount)).toContain('weren\'t recognized as messages');
+      }
+    });
+
+    it('retains before, by, and until qualifiers in deadlines and removes them from task text', () => {
+      const cases = [
+        ['Priya: I will fix the registration bug and test it before 4 PM.', 'before 4 PM', 'I will fix the registration bug and test it'],
+        ['Sam: I will fix the bug by 4 PM.', 'by 4 PM', 'I will fix the bug'],
+        ['Sam: I will upload the logo until Friday.', 'until Friday', 'I will upload the logo'],
+      ];
+
+      for (const [message, deadline, task] of cases) {
+        const result = analyzeConversation(message);
+        expect(result.actions).toContainEqual(expect.objectContaining({ task, deadline }));
+      }
+    });
+
     it.each([
       ['I will fix the bug by 4 PM', 'I will fix the bug'],
       ['I will upload the logo by Friday', 'I will upload the logo'],
@@ -823,6 +940,20 @@ describe('analyzeConversation — edge cases', () => {
         task: 'review the doc ASAP',
         assignee: 'Unassigned',
       }));
+    });
+
+    it('keeps the Copy Briefing control at least 44px high on phone layouts', () => {
+      const source = readFileSync(new URL('../components/Briefing.tsx', import.meta.url), 'utf8');
+      expect(source).toMatch(/min-h-\[44px\].*sm:min-h-0|sm:min-h-0.*min-h-\[44px\]/);
+    });
+
+    it('documents only AI tools evidenced in the commit history', () => {
+      const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
+      expect(readme).not.toContain('Bolt.new');
+      expect(readme).toContain('Devin');
+      expect(readme).toContain('Copilot');
+      expect(readme).not.toContain('AI contribution: Bolt.new');
+      expect(readme).toContain('## Generative AI Usage');
     });
 
     it('creates unassigned TODO and polite-request actions, and tentative name-directed requests', () => {

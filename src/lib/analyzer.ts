@@ -5,6 +5,7 @@ export interface ParsedMessage {
   text: string;
   timestamp?: string;
   raw: string;
+  unsupportedFormatContext?: boolean;
 }
 
 export type ItemStatus = 'confirmed' | 'tentative';
@@ -122,8 +123,6 @@ const URGENCY_MARKERS = [
   /\bnot optional\b/i,
   /\bfinal (call|chance|reminder)\b/i,
   /\blast (call|chance|reminder)\b/i,
-  /\btonight\b/i,
-  /\btoday\b/i,
   /\bby (end of )?(today|tomorrow|tonight|eod)\b/i,
   /\bbefore (class|tomorrow|Monday|Tuesday|Wednesday|Thursday|Friday)\b/i,
 ];
@@ -134,10 +133,12 @@ const ACTION_VERBS = [
   /\bwil+ you\b/i,
   /\bplease\b/i,
   /\b(?:I'll|I will)\b/i,
+  /\b(?:I own|I'm responsible for|I am responsible for|I'm taking|I am taking)\b/i,
+  /\b(?:own|responsible for|will)\b/i,
   /\bassign(?:ed)?\s+(?:to\s+)?(?:you|@?\w+)\b/i,
   /\b(?:you|@?\w+)\s+(?:should|need to|have to|must)\b/i,
   /\b(?:your|@?\w+'s)\s+(?:turn|responsibility|job|task)\b/i,
-  /\b(?:take care of|handle|prepare|finish|complete|submit|send|post|update|write|create|review|check|book|reserve|order|fix)\b/i,
+  /\b(?:take care of|handle|prepare|finish|complete|submit|send|post|update|write|create|review|check|book|reserve|order|confirm|fix)\b/i,
 ];
 
 const TASK_VERB_SOURCE =
@@ -174,6 +175,7 @@ const NON_DECISION_MARKERS = [
   /\buncertain\b/i,
   /\bdecided\s+against\b/i,
   /\b(?:reject(?:ed|ing)?|ruled out|vetoed)\b/i,
+  /\b(?:only a suggestion|just an idea|not final|not confirmed|unconfirmed|yet to be confirmed|not decided)\b/i,
   /\b(?:don't|do not|didn't|did not)\s+agree\b/i,
   /\b(?:don't|do not|didn't|did not|won't|will not)\s+(?:go with|choose|use|select|adopt)\b/i,
   /\b(?:not|never)\s+(?:go(?:ing)?|choose|use|select|adopt)\s+(?:with\s+)?\w+/i,
@@ -203,16 +205,18 @@ const CASUAL_MARKERS = [
 // Day/Date extraction patterns
 const DATE_PATTERNS: RegExp[] = [
   /\bdeadline(?:\s+is)?(?:\s+by)?\s+(?:(?:this|next)\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:at\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight))?\b/gi,
-  /\b(?:(?:by|before|on|due)\s+)?(?:this\s+|next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:at\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight))?\b/gi,
+  /\b(?:(?:by|before|until|till|after|on|due)\s+)?(?:this\s+|next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:at\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight))?\b/gi,
   /\b(?:by|before|on|due)\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi,
   /\b(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?)(?:\s*,?\s*\d{4})?\b/gi,
   /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g,
   /\b(?:today|tomorrow|tonight)(?:\s+(?:at\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight))\b/gi,
+  /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\s+(?:today|tomorrow|tonight)\b/gi,
   /\b(?:today|tomorrow|tonight|this (?:morning|afternoon|evening|week|weekend))\b/gi,
   /\bnext week\b/gi,
   /\bend of (?:day|week|class|tomorrow)\b/gi,
   /\b(?:at\s+)?\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi,
   /\b\d{1,2}\s*(?:am|pm)\b/gi,
+  /\b(?:by|before|until|till|after|on|at)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi,
 ];
 
 const TENTATIVE_CUES = [
@@ -226,6 +230,10 @@ const TENTATIVE_CUES = [
   /\bif\b/i,
   /\bshould we\b/i,
   /\?/,
+];
+
+const UNCONFIRMED_CUES = [
+  /\b(?:only a suggestion|just an idea|not final|not confirmed|unconfirmed|yet to be confirmed|not decided|tbd)\b/i,
 ];
 
 const EXPLICIT_ACTION_CUES = [
@@ -318,6 +326,7 @@ export function parseConversation(raw: string): ParseResult {
   let rawBuffer: string[] = [];
   let ignoredSystemLineCount = 0;
   let unparsedLineCount = 0;
+  let unsupportedFormatContext = false;
 
   const flushBuffer = () => {
     if (buffer.length > 0 && currentSender) {
@@ -355,12 +364,14 @@ export function parseConversation(raw: string): ParseResult {
       currentSender = '';
       currentTimestamp = undefined;
       unparsedLineCount += 1;
+      unsupportedFormatContext = true;
       messages.push({
         id: messages.length + 1,
         messageIndex: messages.length + 1,
         sender: 'Unknown',
         text: line,
         raw: line,
+        unsupportedFormatContext: true,
       });
       continue;
     }
@@ -389,6 +400,7 @@ export function parseConversation(raw: string): ParseResult {
             sender: 'Unknown',
             text: line,
             raw: line,
+            unsupportedFormatContext,
           });
         }
         continue;
@@ -405,6 +417,7 @@ export function parseConversation(raw: string): ParseResult {
       flushBuffer();
       currentSender = parsed.sender;
       currentTimestamp = parsed.timestamp;
+      unsupportedFormatContext = false;
       seenSenders.add(normalizedLabel);
       buffer = [parsed.text];
       rawBuffer = [line];
@@ -439,6 +452,7 @@ export function parseConversation(raw: string): ParseResult {
         sender: 'Unknown',
         text: line,
         raw: line,
+        unsupportedFormatContext,
       });
     }
   }
@@ -504,7 +518,7 @@ function extractDates(text: string): string[] {
       const value = match[0]
         .trim()
         .replace(/[.,;!?]+$/, '')
-        .replace(/^deadline(?:\s+is)?(?:\s+by)?\s+/i, '');
+        .replace(/^(?:deadline(?:\s+is)?(?:\s+by)?|due)\s+/i, '');
       if (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value)) {
         const [first, second, yearText] = value.split('/').map(Number);
         if (value === '24/7') continue;
@@ -530,8 +544,61 @@ function extractDates(text: string): string[] {
   );
 }
 
+function getCurrentDates(text: string): string[] {
+  const dates = extractDates(text);
+  const change = text.match(
+    /\b(?:moved|changed|pushed|shifted|rescheduled|postponed)\b[^.!?]*?\bfrom\b([\s\S]*?)\bto\b/i
+  );
+  if (change?.index !== undefined) {
+    const oldDateStart = change.index + change[0].indexOf(change[1]);
+    const newDateStart = change.index + change[0].length;
+    return dates.filter((date) => {
+      const dateIndex = text.toLowerCase().indexOf(date.toLowerCase(), change.index);
+      return dateIndex < oldDateStart || dateIndex >= newDateStart;
+    });
+  }
+
+  const nowDue = text.match(/\bnow\s+due\b[\s\S]*?\binstead of\b/i);
+  if (nowDue?.index !== undefined) {
+    const insteadIndex = nowDue.index + nowDue[0].length;
+    return dates.filter((date) => {
+      const dateIndex = text.toLowerCase().indexOf(date.toLowerCase(), nowDue.index);
+      return dateIndex < 0 || dateIndex < insteadIndex;
+    });
+  }
+  return dates;
+}
+
+function getOwnershipTask(
+  text: string,
+  participants: string[]
+): { kind: 'self'; task: string } | { kind: 'named'; assignee: string; task: string } | undefined {
+  const cleanTask = (value: string) =>
+    value.replace(/^[\s:,-]+/, '').replace(/^(?:the|a|an)\s+/i, '').replace(/[.!?]+\s*$/, '').trim();
+  const selfMatch = text.match(
+    /^\s*(?:I own|I(?:'m| am) responsible for|I(?:'m| am) taking|I'll handle|I will handle|I'll take care of|I will take care of)\s+(.+?)\s*[.!?]*$/i
+  );
+  if (selfMatch) return { kind: 'self', task: cleanTask(selfMatch[1]) };
+
+  const namedMatch = text.match(
+    /^\s*([\p{Lu}][\p{L}\p{M}'’.-]+)\s+(?:will|is responsible for)\s+(.+?)\s*[.!?]*$/u
+  );
+  if (namedMatch) {
+    const name = namedMatch[1];
+    const reserved = new Set(['everyone', 'we', 'they', 'it']);
+    const isParticipant = participants.some((participant) =>
+      participant.toLocaleLowerCase() === name.toLocaleLowerCase()
+    );
+    if (!reserved.has(name.toLocaleLowerCase()) && (isParticipant || /^\p{Lu}/u.test(name))) {
+      return { kind: 'named', assignee: name, task: cleanTask(namedMatch[2]) };
+    }
+  }
+  return undefined;
+}
+
 function isTentative(text: string): boolean {
-  return TENTATIVE_CUES.some((cue) => cue.test(text));
+  return TENTATIVE_CUES.some((cue) => cue.test(text)) ||
+    UNCONFIRMED_CUES.some((cue) => cue.test(text));
 }
 
 function matchedCues(text: string, patterns: RegExp[]): string[] {
@@ -611,6 +678,12 @@ function getDecisionClauses(text: string): Array<{ decision: string; rejectedOpt
       rejectedOptions,
       status: isTentative(text) ? 'tentative' : 'confirmed',
     });
+  } else if (decisions.length === 0 && UNCONFIRMED_CUES.some((cue) => cue.test(text))) {
+    decisions.push({
+      decision: text.trim(),
+      rejectedOptions: [],
+      status: 'tentative',
+    });
   }
   return decisions;
 }
@@ -640,7 +713,8 @@ export function analyzeConversation(
 
   for (const msg of messages) {
     const text = msg.text;
-    if (isUnsupportedTimestampHeader(msg) || isUnattributedLabelLine(msg)) continue;
+    if (isUnsupportedTimestampHeader(msg) || isUnattributedLabelLine(msg) ||
+      msg.unsupportedFormatContext) continue;
 
     // Skip pure casual messages for everything except explicit @mentions
     const casual = isCasual(text);
@@ -676,8 +750,9 @@ export function analyzeConversation(
         isExplicitNameDirectedRequest(text)) &&
       (!casual || hasMention)
     ) {
+      const ownerTask = getOwnershipTask(text, participants);
       const actionMatch = ACTION_VERBS.find((p) => p.test(text));
-      if (actionMatch) {
+      if (actionMatch || ownerTask) {
         // Detect assignee - only assign when there's explicit evidence
         const mentionMatch = text.match(/@(\w+)/);
         let assignee = '';
@@ -685,6 +760,12 @@ export function analyzeConversation(
 
         if (mentionMatch) {
           assignee = mentionMatch[1];
+          assigneeIsUser = userLower ? assignee.toLowerCase() === userLower : false;
+        } else if (ownerTask?.kind === 'self') {
+          assignee = msg.sender;
+          assigneeIsUser = userLower ? msg.sender.toLowerCase() === userLower : false;
+        } else if (ownerTask?.kind === 'named') {
+          assignee = ownerTask.assignee;
           assigneeIsUser = userLower ? assignee.toLowerCase() === userLower : false;
         } else if (/(?:I'll|I will)\b/i.test(text)) {
           assignee = msg.sender;
@@ -709,19 +790,19 @@ export function analyzeConversation(
         if (!assignee && hasUnassignedInstruction) assignee = 'Unassigned';
 
         if (assignee) {
-          const dateMatches = extractDates(text);
+          const dateMatches = getCurrentDates(text);
           const deadline = dateMatches.length > 0 ? dateMatches[0] : undefined;
 
           const key = text.slice(0, 50) + assignee;
           if (!seenAction.has(key)) {
             seenAction.add(key);
-            let task = text
+            let task = ownerTask?.task ?? text
               .replace(/^\s*TODO\s*:\s*/i, '')
               .replace(/^\s*please\s+/i, '')
               .replace(/^\s*[\p{Lu}][\p{L}\p{M}'\u2019-]*\s*,\s*(?:can|could)\s+you\s+/iu, '');
             if (deadline) task = task.replace(deadline, '');
             task = task
-              .replace(/\b(?:by|before|on|at|until)\s*$/i, '')
+              .replace(/\b(?:by|before|on|at|until|till|after)\s*$/i, '')
               .replace(/[.!?]+\s*$/, '')
               .trim();
             actions.push({
@@ -769,8 +850,10 @@ export function analyzeConversation(
 
     // --- DATES ---
     if (!casual) {
-      const extractedDates = extractDates(text);
+      const extractedDates = getCurrentDates(text);
+      const hasRelativeDayCue = /\b(?:due|deadline|by|before|until|till|meeting|meet|call|event|appointment|submit|send|finish|complete|confirm|will|i'll|i am going to|we will)\b/i.test(text);
       for (const dateStr of extractedDates) {
+        if (/^(?:today|tomorrow|tonight)$/i.test(dateStr) && !hasRelativeDayCue) continue;
         let type: DateItem['type'] = 'event';
         if (/deadline|due/i.test(text)) type = 'deadline';
         else if (/meeting|meet|zoom|call|catch up|standup/i.test(text)) type = 'meeting';
