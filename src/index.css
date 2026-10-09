@@ -21,7 +21,7 @@
   }
 
   body {
-    @apply bg-aurora-bg text-text-main font-sans antialiased;
+    @apply bg-midnight-950 text-text-main font-sans antialiased;
     font-feature-settings: 'ss01', 'cv01', 'cv03';
   }
 
@@ -65,7 +65,7 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-aurora-bg
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-midnight-950
       bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-400 hover:from-primary-400 hover:via-secondary-400 hover:to-primary-300
       transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/30 active:scale-95;
     background-size: 200% auto;

@@ -45,10 +45,10 @@ export function ConversationInput({
           <span className="section-label">Your signal starts here</span>
         </div>
 
-        <h2 className="font-display text-3xl sm:text-4xl font-600 text-ice-50 mb-3">
+        <h2 className="font-display text-3xl sm:text-4xl font-600 text-text-main mb-3">
           Your signal starts here.
         </h2>
-        <p className="text-ice-300 mb-8 max-w-xl">
+        <p className="text-text-muted mb-8 max-w-xl">
           Paste a real conversation to uncover important decisions, tasks, and deadlines.
           Your text never leaves this browser.
         </p>
@@ -68,19 +68,20 @@ export function ConversationInput({
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder="Paste your conversation here…&#10;&#10;Supported formats:&#10;Name: message text&#10;Name [timestamp]: message text&#10;WhatsApp export format"
-              className="w-full h-56 sm:h-64 bg-transparent resize-none px-5 py-4 text-text-main placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20 rounded-xl text-sm leading-relaxed font-mono"
+              className="w-full h-56 sm:h-64 bg-transparent resize-none px-5 py-4 text-text-main placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 focus:ring-offset-midnight-950 rounded-xl text-sm leading-relaxed font-mono"
               spellCheck={false}
               disabled={isProcessing}
+              id="conversation-input"
               aria-label="Paste your conversation messages here"
               aria-describedby="char-count"
             />
           </div>
 
           {/* Footer bar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-5 py-3 border-t border-ice-500/10">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-5 py-3 border-t border-text-muted/10">
             {/* Left: char count + clear */}
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-xs text-ice-400" id="char-count">
+              <div className="flex items-center gap-2 text-xs text-text-muted" id="char-count">
                 <FileText className="w-3.5 h-3.5" />
                 <span className={charCount < MIN_CHARS && charCount > 0 ? 'text-amber-400' : ''}>
                   {charCount.toLocaleString()} / {MAX_CHARS.toLocaleString()}
@@ -90,7 +91,7 @@ export function ConversationInput({
                 <button
                   onClick={onClear}
                   disabled={isProcessing}
-                  className="flex items-center gap-1.5 text-xs text-ice-400 hover:text-ice-200 transition-colors disabled:opacity-40"
+                  className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-main transition-colors disabled:opacity-40"
                   aria-label="Clear input"
                 >
                   <Eraser className="w-3.5 h-3.5" />
@@ -152,7 +153,7 @@ export function ConversationInput({
 
         {/* Validation hint */}
         {charCount > 0 && charCount < MIN_CHARS && (
-          <p className="mt-3 text-sm text-ice-400">
+          <p className="mt-3 text-sm text-text-muted">
             Add at least {MIN_CHARS} characters to analyze ({MIN_CHARS - charCount} more to go).
           </p>
         )}
@@ -168,8 +169,8 @@ export function ConversationInput({
         {isProcessing && (
           <div className="mt-6 glass-panel p-6 animate-fade-in" role="status" aria-live="polite">
             <div className="flex items-center gap-3">
-              <Loader2 className="w-5 h-5 text-teal-300 animate-spin" />
-              <span className="text-sm text-ice-300 font-mono">Analyzing your conversation on this device…</span>
+              <Loader2 className="w-5 h-5 text-primary-300 animate-spin" />
+              <span className="text-sm text-text-muted font-mono">Analyzing your conversation on this device…</span>
             </div>
           </div>
         )}

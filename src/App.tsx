@@ -30,7 +30,7 @@ export default function App() {
   const scrollToInput = useCallback(() => {
     if (result) {
       setResult(null);
-      setConversation('');
+      // Don't clear conversation or username - let user keep them
       setError(null);
     }
     setTimeout(() => {
@@ -47,20 +47,18 @@ export default function App() {
     setError(null);
     setIsProcessing(true);
 
-    // Brief delay for UX clarity — actual analysis is synchronous
-    setTimeout(() => {
-      try {
-        const analysis = analyzeConversation(conversation, userName.trim() || undefined);
-        setResult(analysis);
-        setIsProcessing(false);
-        setTimeout(() => {
-          briefingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-      } catch {
-        setError('Something went wrong while analyzing. Please try again.');
-        setIsProcessing(false);
-      }
-    }, 600);
+    // Analysis is synchronous - no artificial delay
+    try {
+      const analysis = analyzeConversation(conversation, userName.trim() || undefined);
+      setResult(analysis);
+      setIsProcessing(false);
+      setTimeout(() => {
+        briefingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    } catch {
+      setError('Something went wrong while analyzing. Please try again.');
+      setIsProcessing(false);
+    }
   }, [conversation, userName]);
 
   const handleClear = useCallback(() => {

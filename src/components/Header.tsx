@@ -7,7 +7,7 @@ interface HeaderProps {
 
 export function Header({ onNavigate, onFindSignal }: HeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-ice-500/5 backdrop-blur-xl bg-midnight-950/70">
+    <header className="fixed top-0 left-0 right-0 z-50 border-b border-text-muted/5 backdrop-blur-xl bg-midnight-950/70">
       <div className="max-w-7xl mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
         {/* Wordmark */}
         <button

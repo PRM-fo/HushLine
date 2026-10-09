@@ -62,9 +62,9 @@ export default {
         },
       },
       fontFamily: {
-        display: ['"Fraunces"', 'serif'],
-        sans: ['"Inter"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        display: ['Georgia', 'serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Consolas', 'Monaco', 'Liberation Mono', 'Courier New', 'monospace'],
       },
       animation: {
         'wave-pulse': 'wavePulse 2.5s ease-in-out infinite',

@@ -106,14 +106,14 @@ export function Hero({ onFindSignal }: HeroProps) {
             </div>
 
             {/* Headline */}
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-600 leading-[1.1] tracking-tight text-balance text-ice-50 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-600 leading-[1.1] tracking-tight text-balance text-text-main animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
               500 messages.
               <br />
               <span className="gradient-text">One clear signal.</span>
             </h1>
 
             {/* Supporting text */}
-            <p className="mt-6 text-lg text-ice-300 leading-relaxed max-w-md mx-auto lg:mx-0 text-balance animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+            <p className="mt-6 text-lg text-text-muted leading-relaxed max-w-md mx-auto lg:mx-0 text-balance animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
               Cut through the noise. Find what matters. Catch up in seconds.
             </p>
 

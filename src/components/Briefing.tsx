@@ -158,20 +158,28 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
   const userMentions = result.mentions.filter((m) => m.isUser);
   const otherMentions = result.mentions.filter((m) => !m.isUser);
 
-  const copySummary = () => {
+  const copySummary = async () => {
     const text = `HUSHLINE BRIEFING\n\nSummary: ${result.summary}\n\nUrgent:\n${result.urgent.map((u) => `- ${u.title}`).join('\n')}\n\nActions for ${userName || 'you'}:\n${userActions.map((a) => `- ${a.task}${a.deadline ? ` (due: ${a.deadline})` : ''}`).join('\n')}\n\nDecisions:\n${result.decisions.map((d) => `- ${d.decision}`).join('\n')}\n\nDates:\n${result.dates.map((d) => `- ${d.date}: ${d.event}`).join('\n')}`;
-    navigator.clipboard.writeText(text);
-    setCopiedSummary(true);
-    setTimeout(() => setCopiedSummary(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 2000);
+    } catch {
+      // Silently fail - clipboard API may not be available
+    }
   };
 
-  const copyActions = () => {
+  const copyActions = async () => {
     const text = userActions.length > 0
       ? `Your action items:\n${userActions.map((a) => `- ${a.task}${a.deadline ? ` (due: ${a.deadline})` : ''}`).join('\n')}`
       : 'No tasks assigned to you in this conversation.';
-    navigator.clipboard.writeText(text);
-    setCopiedActions(true);
-    setTimeout(() => setCopiedActions(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedActions(true);
+      setTimeout(() => setCopiedActions(false), 2000);
+    } catch {
+      // Silently fail - clipboard API may not be available
+    }
   };
 
   const showCategory = (cat: Category) => activeCategory === 'all' || activeCategory === cat;
@@ -184,10 +192,10 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-px bg-teal-400/40" />
+              <div className="w-8 h-px bg-primary-500/40" />
               <span className="section-label">Step 02 — The Briefing</span>
             </div>
-            <h2 className="font-display text-3xl sm:text-4xl font-600 text-ice-50">
+            <h2 className="font-display text-3xl sm:text-4xl font-600 text-text-main">
               Your signal, extracted.
             </h2>
           </div>
@@ -222,23 +230,23 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-teal-300" />
-              <h3 className="font-display text-xl font-600 text-ice-50">The Signal</h3>
+              <h3 className="font-display text-xl font-600 text-text-main">The Signal</h3>
             </div>
             <button
               onClick={copySummary}
-              className="flex items-center gap-1.5 text-xs text-ice-400 hover:text-teal-300 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-text-muted hover:text-primary-300 transition-colors"
               aria-label="Copy full briefing to clipboard"
             >
               {copiedSummary ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               {copiedSummary ? 'Copied!' : 'Copy briefing'}
             </button>
           </div>
-          <p className="text-ice-200 leading-relaxed text-base">{result.summary}</p>
+          <p className="text-text-muted leading-relaxed text-base">{result.summary}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {result.participants.map((p) => (
               <span
                 key={p}
-                className="px-2.5 py-1 rounded-full bg-midnight-700/40 text-xs text-ice-300 font-mono"
+                className="px-2.5 py-1 rounded-full bg-midnight-700/40 text-xs text-text-muted font-mono"
               >
                 {p}
               </span>
@@ -247,7 +255,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         </div>
 
         {/* Filter tabs */}
-        <div className="flex flex-wrap gap-2 mb-4 sticky top-16 z-30 py-3 -mx-2 px-2 bg-aurora-bg/80 backdrop-blur-md rounded-xl" role="group" aria-label="Filter results by category">
+        <div className="flex flex-wrap gap-2 mb-4 sticky top-16 z-30 py-3 -mx-2 px-2 bg-midnight-950/80 backdrop-blur-md rounded-xl" role="group" aria-label="Filter results by category">
           {CATEGORIES.map((cat) => {
             const Icon = cat.icon;
             const isActive = activeCategory === cat.key;
@@ -530,7 +538,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="glass-panel p-6 text-center">
-      <p className="text-ice-400 text-sm">{text}</p>
+      <p className="text-text-muted text-sm">{text}</p>
     </div>
   );
 }

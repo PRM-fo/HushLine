@@ -125,14 +125,6 @@ export function Privacy() {
             );
           })}
         </div>
-
-        {/* Trust indicator */}
-        <div className="mt-8 flex items-center justify-center gap-3 px-6 py-4 rounded-xl bg-primary-500/8 border border-primary-500/15 max-w-md mx-auto">
-          <Eye className="w-5 h-5 text-primary-300" />
-          <p className="text-sm text-primary-200">
-            <span className="font-600">Verified:</span> zero network requests during analysis.
-          </p>
-        </div>
       </div>
     </section>
   );
