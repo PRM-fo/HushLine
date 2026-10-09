@@ -1,16 +1,16 @@
-import { Cpu, Eye, EyeOff, Lock, Search, ShieldCheck, Zap } from 'lucide-react';
+import { Cpu, EyeOff, Lock, Search, ShieldCheck, Zap } from 'lucide-react';
 
 export function HowItWorks() {
   const steps = [
     {
       icon: Search,
       title: 'Paste the conversation',
-      desc: 'Copy any group chat — Discord, WhatsApp, Slack, iMessage. No accounts, no exports, no plugins.',
+      desc: 'Paste a supported chat export or messages in Name: message format. WhatsApp Android and iOS export lines are supported.',
     },
     {
       icon: Cpu,
       title: 'Analyze on-device',
-      desc: 'Hushline parses every message locally in your browser using a heuristic engine — no data leaves your device.',
+      desc: 'The analyzer is implemented in the browser and uses pattern matching; there is no server-side analysis endpoint in this app.',
     },
     {
       icon: Zap,
@@ -64,18 +64,18 @@ export function Privacy() {
   const principles = [
     {
       icon: Cpu,
-      title: 'Processed on this device',
-      desc: 'Your pasted conversations are analyzed entirely in your browser. No text is transmitted to servers, APIs, or cloud AI.',
+      title: 'Browser-side heuristic analysis',
+      desc: 'The analyzer runs in browser code, and this repository has no server-side analysis endpoint.',
     },
     {
       icon: Lock,
-      title: 'No accounts, no tracking',
-      desc: 'No sign-up, no login, no analytics. Hushline never requests access to your chat accounts or contact lists.',
+      title: 'No account integration',
+      desc: 'This app has no sign-up, login, or analytics integration and does not request access to chat accounts or contacts.',
     },
     {
       icon: EyeOff,
-      title: 'Memory only, cleared on reset',
-      desc: 'Pasted text stays in browser memory and is cleared the moment you start a new conversation or close the tab.',
+      title: 'Input is not saved by the app',
+      desc: 'The current page keeps pasted text in application memory. There is no feature to save or restore conversations.',
     },
     {
       icon: ShieldCheck,
@@ -97,10 +97,10 @@ export function Privacy() {
             <div className="w-8 h-px bg-primary-500/40" />
           </div>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-600 text-text-main text-balance mb-4">
-            Your conversations stay yours.
+            How conversation analysis works.
           </h2>
           <p className="text-text-muted max-w-2xl mx-auto text-balance">
-            Privacy isn't a feature we tacked on — it's the foundation. Everything happens in your browser. Nothing is sent, stored, or shared.
+            Conversation analysis runs in the browser with a local heuristic engine. Hosting and browser-level network behavior are outside this app's analysis.
           </p>
         </div>
 

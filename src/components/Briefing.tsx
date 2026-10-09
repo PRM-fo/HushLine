@@ -152,6 +152,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
   const [priorityFilter, setPriorityFilter] = useState<Priority>('all');
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [copiedActions, setCopiedActions] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const userActions = result.actions.filter((a) => a.assigneeIsUser);
   const otherActions = result.actions.filter((a) => !a.assigneeIsUser);
@@ -159,13 +160,14 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
   const otherMentions = result.mentions.filter((m) => !m.isUser);
 
   const copySummary = async () => {
-    const text = `HUSHLINE BRIEFING\n\nSummary: ${result.summary}\n\nUrgent:\n${result.urgent.map((u) => `- ${u.title}`).join('\n')}\n\nActions for ${userName || 'you'}:\n${userActions.map((a) => `- ${a.task}${a.deadline ? ` (due: ${a.deadline})` : ''}`).join('\n')}\n\nDecisions:\n${result.decisions.map((d) => `- ${d.decision}`).join('\n')}\n\nDates:\n${result.dates.map((d) => `- ${d.date}: ${d.event}`).join('\n')}`;
+    const text = `HUSHLINE BRIEFING\n\nSummary: ${result.summary}\n\nUrgent:\n${result.urgent.map((u) => `- ${u.title}`).join('\n')}\n\nActions for ${userName || 'you'}:\n${userActions.map((a) => `- ${a.task}${a.deadline ? ` (due: ${a.deadline})` : ''}`).join('\n')}\n\nDecisions:\n${result.decisions.map((d) => `- ${d.decision}`).join('\n')}\n\nDates:\n${result.dates.map((d) => `- ${d.date}: ${d.event}`).join('\n')}\n\nMentions:\n${result.mentions.map((m) => `- @${m.mentionedUser}: ${m.context}`).join('\n')}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopiedSummary(true);
+      setCopyError(null);
       setTimeout(() => setCopiedSummary(false), 2000);
     } catch {
-      // Silently fail - clipboard API may not be available
+      setCopyError('Unable to copy the briefing. Check clipboard permissions and try again.');
     }
   };
 
@@ -176,9 +178,10 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedActions(true);
+      setCopyError(null);
       setTimeout(() => setCopiedActions(false), 2000);
     } catch {
-      // Silently fail - clipboard API may not be available
+      setCopyError('Unable to copy action items. Check clipboard permissions and try again.');
     }
   };
 
@@ -199,9 +202,9 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
               Your signal, extracted.
             </h2>
           </div>
-          <button onClick={onReset} className="btn-secondary text-sm self-start sm:self-auto" aria-label="Start a new conversation">
+          <button onClick={onReset} className="btn-secondary text-sm self-start sm:self-auto" aria-label="Return to the conversation input">
             <RefreshCw className="w-4 h-4" />
-            New conversation
+            Edit conversation
           </button>
         </div>
 
@@ -209,10 +212,15 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         <div className="flex items-center gap-2 mb-6 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 border border-primary-500/25" role="status">
           <Cpu className="w-4 h-4 text-primary-300" />
           <span className="text-sm text-primary-200">
-            Processed entirely on your device — your conversation was never sent anywhere.
+            Analyzed in this browser using local pattern matching.
           </span>
           <span className="ml-auto text-xs font-mono text-text-muted">at {result.processedAt}</span>
         </div>
+        {copyError && (
+          <p className="mb-6 text-sm text-red-300" role="alert" aria-live="assertive">
+            {copyError}
+          </p>
+        )}
 
         {/* Stats */}
         <div className="flex flex-wrap gap-3 mb-8" role="group" aria-label="Briefing statistics">

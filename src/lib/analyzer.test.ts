@@ -70,6 +70,47 @@ describe('parseMessages', () => {
     expect(messages[0].text).toContain('First line');
     expect(messages[0].text).toContain('second line');
   });
+
+  it('parses timestamp-first WhatsApp Android export lines with seconds and AM/PM', () => {
+    const messages = parseMessages(
+      '\u200e12/31/20, 10:00:05 PM - Alice: Hello\n31/12/2020, 22:30 - Bob: Hi'
+    );
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatchObject({
+      sender: 'Alice',
+      text: 'Hello',
+      timestamp: '12/31/20, 10:00:05 PM',
+    });
+    expect(messages[1]).toMatchObject({
+      sender: 'Bob',
+      text: 'Hi',
+      timestamp: '31/12/2020, 22:30',
+    });
+  });
+
+  it('parses bracketed WhatsApp iOS timestamps with and without seconds', () => {
+    const messages = parseMessages(
+      '[12/31/20, 10:00 PM] Alice: Hello\n[31/12/2020, 22:30:05] Bob: Hi'
+    );
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatchObject({
+      sender: 'Alice',
+      text: 'Hello',
+      timestamp: '12/31/20, 10:00 PM',
+    });
+    expect(messages[1]).toMatchObject({
+      sender: 'Bob',
+      text: 'Hi',
+      timestamp: '31/12/2020, 22:30:05',
+    });
+  });
+
+  it('does not interpret instruction labels as sender names', () => {
+    const messages = parseMessages('Step one: prepare the slides\nTODO: call Priya\nDeadline: 5th December');
+    expect(messages).toHaveLength(3);
+    expect(messages.map((message) => message.sender)).toEqual(['Unknown', 'Unknown', 'Unknown']);
+    expect(messages[0].text).toBe('Step one: prepare the slides');
+  });
 });
 
 describe('analyzeConversation — test fixture (project group chat)', () => {
@@ -285,9 +326,73 @@ describe('analyzeConversation — edge cases', () => {
       expect(result.decisions.length).toBe(0);
     });
 
+    it('does not treat rejected proposals as decisions', () => {
+      const result = analyzeConversation(
+        'Alice: We rejected React\nBob: Let\'s not go with Vue\nCara: We decided against Angular'
+      );
+      expect(result.decisions).toEqual([]);
+    });
+
     it('treats confirmed decisions as decisions', () => {
       const result = analyzeConversation('Alice: Let\'s go with option A\nBob: Agreed', 'Alice');
       expect(result.decisions.length).toBeGreaterThan(0);
+    });
+
+    it('continues extracting dates and announcements after an unassigned action phrase', () => {
+      const result = analyzeConversation('Please note the exam is on December 5th');
+      expect(result.dates.some((date) => date.date.toLowerCase().includes('december 5th'))).toBe(true);
+      expect(result.announcements).toHaveLength(1);
+    });
+
+    it('continues extracting decisions after an unassigned action phrase', () => {
+      const result = analyzeConversation('We decided to go with React, please update the repo');
+      expect(result.decisions.some((decision) => /react/i.test(decision.decision))).toBe(true);
+      expect(result.actions).toEqual([]);
+    });
+
+    it('extracts meeting times and relative dates without a moved-to fragment', () => {
+      const result = analyzeConversation('Meeting moved to 4:30 pm tomorrow, please confirm');
+      expect(result.dates.some((date) => /4:30\s*pm/i.test(date.date))).toBe(true);
+      expect(result.dates.some((date) => /tomorrow/i.test(date.date))).toBe(true);
+      expect(result.dates.every((date) => date.date.toLowerCase() !== 'moved to')).toBe(true);
+      expect(result.actions).toEqual([]);
+    });
+
+    it('recognizes a sender task and ordinal day-month deadline', () => {
+      const result = analyzeConversation('Priya: Submit by 5th December', 'Priya');
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0]).toMatchObject({ assignee: 'Priya', assigneeIsUser: true });
+      expect(result.dates.some((date) => /5th december/i.test(date.date))).toBe(true);
+    });
+
+    it('recognizes abbreviated day-month dates', () => {
+      const result = analyzeConversation('Alice: The review is on 15 Oct');
+      expect(result.dates.some((date) => /15 oct/i.test(date.date))).toBe(true);
+    });
+
+    it('does not infer task ownership from generic you or your wording', () => {
+      const result = analyzeConversation('Alice: Can you update the repo?\nBob: Your notes are helpful', 'Priya');
+      expect(result.actions).toEqual([]);
+    });
+
+    it('does not mark mentions as user mentions when no username is configured', () => {
+      const result = analyzeConversation('Alice: @Priya please review the repo');
+      expect(result.mentions).toHaveLength(1);
+      expect(result.mentions[0].isUser).toBe(false);
+      expect(result.actions[0].assigneeIsUser).toBe(false);
+    });
+
+    it('assigns a task explicitly directed to a named participant', () => {
+      const result = analyzeConversation('Alice: Priya, please submit the form', 'Priya');
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0]).toMatchObject({ assignee: 'Priya', assigneeIsUser: true });
+    });
+
+    it('does not extract bare numbers, fractions, or 24/7 as dates', () => {
+      const result = analyzeConversation(
+        'Alice: Meet me at 5\nBob: The ratio is 3/4\nCara: Support is available 24/7'
+      );
+      expect(result.dates).toEqual([]);
     });
 
     it('handles Unicode sender names', () => {

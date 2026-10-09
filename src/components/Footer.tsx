@@ -21,7 +21,7 @@ export function Footer() {
           </p>
 
           <p className="text-xs text-text-dim font-mono">
-            Built for the unread problem · 100% on-device
+            Built for the unread problem · Local pattern matching
           </p>
         </div>
       </div>

@@ -67,8 +67,6 @@ export default function App() {
   }, []);
 
   const handleReset = useCallback(() => {
-    setConversation('');
-    setUserName('');
     setError(null);
     setResult(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });

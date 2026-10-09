@@ -12,7 +12,6 @@ interface ConversationInputProps {
   error: string | null;
 }
 
-const MAX_CHARS = 100000;
 const MIN_CHARS = 20;
 
 export function ConversationInput({
@@ -30,7 +29,6 @@ export function ConversationInput({
 
   const charCount = value.length;
   const canAnalyze = charCount >= MIN_CHARS && !isProcessing;
-  const progressPct = Math.min((charCount / MAX_CHARS) * 100, 100);
 
   const handleAnalyze = () => {
     if (canAnalyze) onAnalyze();
@@ -50,7 +48,7 @@ export function ConversationInput({
         </h2>
         <p className="text-text-muted mb-8 max-w-xl">
           Paste a real conversation to uncover important decisions, tasks, and deadlines.
-          Your text never leaves this browser.
+          Analysis uses local pattern matching in this browser.
         </p>
 
         {/* Input card */}
@@ -61,19 +59,21 @@ export function ConversationInput({
         >
           {/* Textarea */}
           <div className="p-1">
+            <label htmlFor="conversation-input" className="block px-5 pt-4 text-sm font-medium text-text-main">
+              Conversation text
+            </label>
             <textarea
               ref={textareaRef}
               value={value}
-              onChange={(e) => onChange(e.target.value.slice(0, MAX_CHARS))}
+              onChange={(e) => onChange(e.target.value)}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="Paste your conversation here…&#10;&#10;Supported formats:&#10;Name: message text&#10;Name [timestamp]: message text&#10;WhatsApp export format"
-              className="w-full h-56 sm:h-64 bg-transparent resize-none px-5 py-4 text-text-main placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 focus:ring-offset-midnight-950 rounded-xl text-sm leading-relaxed font-mono"
+              placeholder="Paste your conversation here…&#10;&#10;Supported formats:&#10;Name: message text&#10;WhatsApp Android and iOS exports"
+              className="w-full h-56 sm:h-64 bg-transparent resize-none px-5 py-4 text-text-main placeholder-text-muted/80 focus:outline-none focus:ring-2 focus:ring-primary-300/80 focus:ring-offset-2 focus:ring-offset-midnight-950 rounded-xl text-sm leading-relaxed font-mono"
               spellCheck={false}
               disabled={isProcessing}
               id="conversation-input"
-              aria-label="Paste your conversation messages here"
-              aria-describedby="char-count"
+              aria-describedby="char-count input-hint"
             />
           </div>
 
@@ -84,7 +84,7 @@ export function ConversationInput({
               <div className="flex items-center gap-2 text-xs text-text-muted" id="char-count">
                 <FileText className="w-3.5 h-3.5" />
                 <span className={charCount < MIN_CHARS && charCount > 0 ? 'text-amber-400' : ''}>
-                  {charCount.toLocaleString()} / {MAX_CHARS.toLocaleString()}
+                  {charCount.toLocaleString()} characters
                 </span>
               </div>
               {value.length > 0 && (
@@ -101,15 +101,6 @@ export function ConversationInput({
             </div>
           </div>
 
-          {/* Progress bar */}
-          {charCount > 0 && (
-            <div className="h-0.5 bg-midnight-900 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-400 transition-all duration-300"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-          )}
         </div>
 
         {/* Username + Analyze */}
@@ -152,11 +143,11 @@ export function ConversationInput({
         </div>
 
         {/* Validation hint */}
-        {charCount > 0 && charCount < MIN_CHARS && (
-          <p className="mt-3 text-sm text-text-muted">
-            Add at least {MIN_CHARS} characters to analyze ({MIN_CHARS - charCount} more to go).
-          </p>
-        )}
+        <p id="input-hint" className="mt-3 text-sm text-text-muted" aria-live="polite" aria-atomic="true">
+          {charCount > 0 && charCount < MIN_CHARS
+            ? `Add at least ${MIN_CHARS} characters to analyze (${MIN_CHARS - charCount} more to go).`
+            : ''}
+        </p>
 
         {/* Error */}
         {error && (

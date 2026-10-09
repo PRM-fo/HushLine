@@ -101,7 +101,7 @@ export function Hero({ onFindSignal }: HeroProps) {
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-primary-500/15 to-secondary-500/15 border border-primary-500/30 mb-8 animate-fade-in-up">
               <span className="w-2 h-2 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 animate-pulse" />
               <span className="text-xs font-mono uppercase tracking-[0.15em] text-primary-200/90">
-                Privacy-first · Runs in your browser
+                Local heuristics · Runs in your browser
               </span>
             </div>
 

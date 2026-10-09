@@ -2,7 +2,7 @@
 
 > **Silence the noise. Keep the signal.**
 
-Hushline is a privacy-first web app that helps you catch up on overwhelming group-chat conversations in seconds. Paste any chat export, and Hushline extracts what matters — summaries, urgent items, your tasks, group decisions, key dates, mentions, and buried announcements — all processed entirely in your browser.
+Hushline is a browser-based app that helps you catch up on group-chat conversations. Paste supported chat exports or messages in `Name: message` format, and Hushline applies local heuristics to identify summaries, urgent items, tasks, decisions, dates, mentions, and announcements.
 
 Built for the hackathon challenge **"The Unread Problem — What Did I Miss?"**
 
@@ -14,7 +14,7 @@ Group chats generate hundreds of messages daily. Most are casual noise, but crit
 
 ## Solution & Key Features
 
-- **Conversation Input**: Paste any group chat (WhatsApp, Slack, Discord, iMessage formats supported). Optional username field identifies tasks assigned to you.
+- **Conversation Input**: Paste `Name: message` lines or WhatsApp Android timestamp-first and iOS bracketed exports. Optional username identifies tasks assigned to you.
 - **The Briefing**: A structured dashboard with:
   - **The Signal** — executive summary of the conversation
   - **Urgent** — time-sensitive messages with priority explanations
@@ -26,14 +26,14 @@ Group chats generate hundreds of messages daily. Most are casual noise, but crit
 - **Source Verification**: Every extracted item includes the original message snippet as evidence.
 - **Priority & Category Filtering**: Filter results by category and priority level.
 - **Copy to Clipboard**: Copy the full briefing or just your action items.
-- **Privacy-First**: All processing happens in the browser. No data is ever sent to a server.
+- **Local analysis implementation**: The analyzer runs in the browser and this app does not implement a server-side analysis endpoint. Hosting and browser-level network behavior are not evaluated here.
 - **No Fake Data**: The app starts with a genuinely empty state. All results are derived from the actual conversation you paste — no pre-populated content, no fabricated statistics.
 
 ## Tech Stack & Architecture
 
 - **React 18** + **TypeScript** — UI framework with full type safety
 - **Vite** — build tool and dev server
-- **Tailwind CSS** — styling with a custom midnight/teal design system
+- **Tailwind CSS** — styling with the Midnight Aurora palette
 - **Lucide React** — icons
 - **Vitest** — unit testing
 - **No backend** — entirely client-side application
@@ -82,7 +82,7 @@ npm test
 
 ## Testing
 
-Tests cover the core analyzer pipeline using clearly identified test fixtures (not displayed as real conversations in the product):
+Tests cover parsing and heuristic extraction using clearly identified synthetic fixtures (not displayed as real conversations in the product):
 
 ```bash
 npm test
@@ -91,24 +91,21 @@ npm test
 Test cases include:
 - Empty input handling
 - Very large input handling (2,000 messages)
-- Test fixture verification: deadline detection, meeting time change, decision detection, task assignment, mention extraction, buried announcements, summary generation
+- Test fixture coverage: deadline detection, meeting time change, decision detection, task assignment, mention extraction, buried announcements, summary generation
+- WhatsApp Android and iOS timestamp formats, including timestamps with and without seconds and AM/PM
 - Malformed input (no senders, single line, no colons)
 - Ambiguous tasks (no clear assignee)
 - No-invention verification (casual-only conversations produce empty results)
 - Source snippet presence on all extracted items
 
-## Privacy Model & Verified Limitations
+## Processing Model & Limitations
 
-### What we verify
-- **No network requests**: The analyzer runs entirely in the browser. No `fetch`, `XMLHttpRequest`, WebSocket, or any network API is called during processing.
-- **No storage**: Conversation text is held in React state (memory) only. It is cleared when the user clicks "New conversation" or closes the tab.
-- **No accounts**: No sign-up, login, or authentication of any kind.
-- **No tracking**: No analytics, cookies, or telemetry.
-
-### Limitations
+- The analyzer is local TypeScript code that runs in the browser; this repository does not include a server-side analysis endpoint.
+- This describes the app implementation, not an independent verification of hosting, browser extensions, or all network behavior.
+- Conversation state is held in the current page. The app provides no feature to save or restore conversations.
 - **Heuristic, not AI**: Hushline uses pattern-matching heuristics, not a language model. It may miss implicit or subtly phrased items. This is labeled honestly in the UI — confidence badges distinguish explicit facts from inferred interpretations.
 - **No semantic understanding**: The engine cannot understand context, sarcasm, or nuance the way a language model could.
-- **Browser-only**: Closing the tab clears all data. There is no persistence by design.
+- **Format support**: Export formats other than the tested plain-text and WhatsApp forms are not claimed as supported.
 
 ## Deployment
 
@@ -133,7 +130,7 @@ Run `npm run build` and serve the `dist/` directory with any static file server.
 ```bash
 git init
 git add .
-git commit -m "Initial commit: Hushline — privacy-first conversation analyzer"
+git commit -m "Initial commit: Hushline — browser-based conversation analyzer"
 git branch -M main
 git remote add origin https://github.com/<your-username>/hushline.git
 git push -u origin main
@@ -141,11 +138,11 @@ git push -u origin main
 
 ## Known Limitations
 
-- The heuristic engine works best with English-language conversations.
-- Date extraction recognizes common date formats but may miss unusual formats.
-- Task assignment detection relies on keywords like "need you to", "can you", "@mentions", and "please" — subtle assignments may be missed.
+- The heuristic engine is designed for English-language conversations.
+- Date extraction recognizes selected common formats and may miss unusual formats or ambiguous numeric dates.
+- Task assignment detection relies on explicit names, mentions, sender identity for imperative messages, and action wording; subtle assignments may be missed.
 - The summary is template-based, not generated by a language model.
-- No persistence between sessions (by design for privacy).
+- No persistence between sessions.
 - No fake data, sample conversations, or demo mode — the app only processes real user input.
 
 ## Generative AI Usage
@@ -154,10 +151,9 @@ This section accurately documents the AI tools used in building Hushline:
 
 - **Bolt.new**: Used to generate the initial project scaffold and the majority of the application code, including the analyzer engine, React components, styling, and tests. Bolt.new uses AI-assisted code generation.
 - **Devin**: Used for code inspection, auditing, and improvements including removing unused dependencies, updating metadata, and preparing the repository for hackathon submission.
-- **No runtime AI model**: Hushline does not use any AI model at runtime. All conversation analysis is performed by deterministic heuristic pattern matching in the browser. No language model, neural network, or AI API is invoked during processing.
-- **No external AI services**: User conversations are never sent to any external AI service, API, or cloud function. All processing is local.
+- **No model integration in the analyzer**: Conversation analysis is implemented with deterministic heuristic pattern matching in the browser. This source-level description is not an independent evaluation of runtime network behavior.
 - **AI contribution**: Bolt.new's AI assistant contributed the full application architecture, the heuristic extraction patterns, the UI design system, and all React/TypeScript implementation. Devin assisted with code review and improvements. The human developer reviewed, tested, and refined the output.
 
 ## License
 
-MIT
+No license has been specified for this repository.

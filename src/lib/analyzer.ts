@@ -111,8 +111,10 @@ const ACTION_VERBS = [
   /\b(?:you|@?\w+)\s+(?:should|need to|have to|must)\b/i,
   /\b(?:your|@?\w+'s)\s+(?:turn|responsibility|job|task)\b/i,
   /\b(?:take care of|handle|prepare|finish|complete|submit|send|post|update|write|create|review|check|book|reserve|order)\b/i,
-  /\b@(\w+)/i,
 ];
+
+const TASK_VERB_SOURCE =
+  String.raw`(?:take care of|handle|prepare|finish|complete|submit|send|post|update|write|create|review|check|book|reserve|order|confirm|share|upload)`;
 
 const DECISION_MARKERS = [
   /\blet'?s go with\b/i,
@@ -143,11 +145,16 @@ const NON_DECISION_MARKERS = [
   /\bthink about\b/i,
   /\bnot sure\b/i,
   /\buncertain\b/i,
+  /\bdecided\s+against\b/i,
+  /\b(?:reject(?:ed|ing)?|ruled out|vetoed)\b/i,
+  /\b(?:don't|do not|didn't|did not|won't|will not)\s+(?:go with|choose|use|select|adopt)\b/i,
+  /\b(?:not|never)\s+(?:go(?:ing)?|choose|use|select|adopt)\s+(?:with\s+)?\w+/i,
   /\?\s*$/m, // Ends with question mark
 ];
 
 const ANNOUNCEMENT_MARKERS = [
   /\bFYI\b/i,
+  /\bplease note\b/i,
   /\bheads? up\b/i,
   /\bannouncement\b/i,
   /\bnote? (that|for)\b/i,
@@ -169,13 +176,13 @@ const CASUAL_MARKERS = [
 const DATE_PATTERNS: RegExp[] = [
   /\b(?:by|before|on|due|deadline(?:\s+is)?(?:\s+by)?)\s+(?:this\s+|next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
   /\b(?:by|before|on|due)\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi,
+  /\b(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?)\b/gi,
   /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g,
   /\b(?:today|tomorrow|tonight|this (?:morning|afternoon|evening|week|weekend))\b/gi,
   /\bnext week\b/gi,
   /\bend of (?:day|week|class|tomorrow)\b/gi,
-  /\b(?:at|@)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/gi,
-  /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,
-  /\b(?:rescheduled|moved|changed)\s+to\b/gi,
+  /\b(?:at\s+)?\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi,
+  /\b\d{1,2}\s*(?:am|pm)\b/gi,
 ];
 
 const TIME_CHANGE_MARKERS = [
@@ -194,12 +201,16 @@ const nextId = () => `item_${++idCounter}`;
 
 /**
  * Parse raw pasted text into individual messages.
- * Supports common chat export formats: "Name: text", "Name [time]: text",
- * "Name (time): text", WhatsApp-style "Name, time - text", and plain lines.
+ * Supports "Name: text", "Name [time]: text", "Name (time): text",
+ * WhatsApp Android timestamp-first and legacy lines, iOS bracketed lines,
+ * and plain lines.
  * Supports Unicode sender names.
  */
 export function parseMessages(raw: string): ParsedMessage[] {
-  const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = raw
+    .split('\n')
+    .map((line) => line.replace(/^[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]+/, '').trim())
+    .filter(Boolean);
   const messages: ParsedMessage[] = [];
   let currentSender = '';
   let currentText = '';
@@ -222,40 +233,73 @@ export function parseMessages(raw: string): ParsedMessage[] {
   // Pattern: "Name: message" or "Name [timestamp]: message" or "Name (timestamp): message"
   // Supports Unicode characters in sender names
   const senderLinePattern = /^([^\s:][^:]{0,50}?)\s*(?:\[(.*?)\]|\((.*?)\))?\s*:\s+(.+)$/;
-  // WhatsApp Android: "Name, date, time - message"
-  const whatsappAndroidPattern = /^([^\s,][^,]{0,50}?),\s+\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4},?\s+\d{1,2}:\d{2}\s*(?:AM|PM)?\s*[-–]\s+(.+)$/i;
+  // WhatsApp Android: "date, time - Name: message"
+  const whatsappAndroidPattern = /^(\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)\s+-\s+([^:]{1,50}):\s+(.+)$/i;
+  // Older WhatsApp Android exports: "Name, date, time - message"
+  const legacyWhatsappAndroidPattern = /^([^\s,][^,]{0,50}?),\s+(\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)\s*[-–]\s+(.+)$/i;
   // WhatsApp iOS: "[date, time] Name: message"
-  const whatsappIosPattern = /^\[\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4},?\s+\d{1,2}:\d{2}\s*(?:AM|PM)?\]\s+([^\s:][^:]{0,50}?):\s+(.+)$/i;
+  const whatsappIosPattern = /^\[(\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)\]\s+([^:]{1,50}):\s+(.+)$/i;
+  const reservedSenderPattern = /^(?:step\s+one|todo|deadline)$/i;
 
   for (const line of lines) {
     const waAndroidMatch = line.match(whatsappAndroidPattern);
     const waIosMatch = line.match(whatsappIosPattern);
-    const smMatch = !waAndroidMatch && !waIosMatch ? line.match(senderLinePattern) : null;
+    const legacyWaAndroidMatch = !waAndroidMatch && !waIosMatch
+      ? line.match(legacyWhatsappAndroidPattern)
+      : null;
+    const smMatch = !waAndroidMatch && !waIosMatch && !legacyWaAndroidMatch
+      ? line.match(senderLinePattern)
+      : null;
 
     if (waAndroidMatch) {
       flushBuffer();
-      currentSender = waAndroidMatch[1].trim();
-      currentText = waAndroidMatch[2].trim();
-      currentTimestamp = undefined;
+      currentTimestamp = waAndroidMatch[1].trim();
+      currentSender = waAndroidMatch[2].trim();
+      currentText = waAndroidMatch[3].trim();
       messages.push({
         id: messages.length + 1,
         sender: currentSender,
         text: currentText,
+        timestamp: currentTimestamp,
         raw: line,
       });
       buffer = [];
     } else if (waIosMatch) {
       flushBuffer();
-      currentSender = waIosMatch[1].trim();
-      currentText = waIosMatch[2].trim();
-      currentTimestamp = undefined;
+      currentTimestamp = waIosMatch[1].trim();
+      currentSender = waIosMatch[2].trim();
+      currentText = waIosMatch[3].trim();
       messages.push({
         id: messages.length + 1,
         sender: currentSender,
         text: currentText,
+        timestamp: currentTimestamp,
         raw: line,
       });
       buffer = [];
+    } else if (legacyWaAndroidMatch) {
+      flushBuffer();
+      currentSender = legacyWaAndroidMatch[1].trim();
+      currentTimestamp = legacyWaAndroidMatch[2].trim();
+      currentText = legacyWaAndroidMatch[3].trim();
+      messages.push({
+        id: messages.length + 1,
+        sender: currentSender,
+        text: currentText,
+        timestamp: currentTimestamp,
+        raw: line,
+      });
+      buffer = [];
+    } else if (smMatch && reservedSenderPattern.test(smMatch[1].trim())) {
+      flushBuffer();
+      currentSender = '';
+      currentTimestamp = undefined;
+      messages.push({
+        id: messages.length + 1,
+        sender: 'Unknown',
+        text: line,
+        raw: line,
+      });
     } else if (smMatch) {
       flushBuffer();
       currentSender = smMatch[1].trim();
@@ -284,12 +328,25 @@ function extractDates(text: string): string[] {
   const found: string[] = [];
   for (const pattern of DATE_PATTERNS) {
     pattern.lastIndex = 0;
-    const m = pattern.exec(text);
-    if (m) {
-      found.push(m[0].trim());
+    for (const match of text.matchAll(pattern)) {
+      const value = match[0].trim();
+      if (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value)) {
+        const [month, day] = value.split('/').map(Number);
+        if (value === '24/7' || month < 1 || month > 12 || day < 1 || day > 31) continue;
+        if (/\b(?:fraction|ratio|divided by|out of)\b/i.test(text)) continue;
+      }
+      found.push(value);
     }
   }
-  return found;
+  const unique = [...new Set(found)];
+  return unique.filter(
+    (value) =>
+      !unique.some(
+        (other) =>
+          other.length > value.length &&
+          other.toLowerCase().includes(value.toLowerCase())
+      )
+  );
 }
 
 function isCasual(text: string): boolean {
@@ -392,8 +449,6 @@ export function analyzeConversation(
   const messages = parseMessages(raw);
   const participants = [...new Set(messages.map((m) => m.sender))];
   const userLower = userName?.trim().toLowerCase();
-  // Escape username for safe regex use
-  const escapedUserName = userLower ? userLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
 
   const urgent: UrgentItem[] = [];
   const actions: ActionItem[] = [];
@@ -444,43 +499,46 @@ export function analyzeConversation(
 
         if (mentionMatch) {
           assignee = mentionMatch[1];
-          assigneeIsUser = userLower ? assignee.toLowerCase() === userLower : true;
-        } else if (userLower && new RegExp(`\\b${escapedUserName}\\b`, 'i').test(text)) {
-          assignee = userName!;
-          assigneeIsUser = true;
-        } else if (/\b(?:you|your)\b/i.test(text) && userLower) {
-          assignee = userName!;
-          assigneeIsUser = true;
+          assigneeIsUser = userLower ? assignee.toLowerCase() === userLower : false;
         } else if (/(?:I'll|I will)\b/i.test(text)) {
           assignee = msg.sender;
           assigneeIsUser = userLower ? msg.sender.toLowerCase() === userLower : false;
+        } else {
+          const nameDirectedMatch = text.match(
+            new RegExp(`^\\s*(?:please\\s+)?([\\p{L}][\\p{L}'’-]{0,30}),?\\s+(?:please\\s+)?${TASK_VERB_SOURCE}\\b`, 'iu')
+          );
+          const senderTaskMatch = new RegExp(`^\\s*(?:please\\s+)?${TASK_VERB_SOURCE}\\b`, 'i').test(text);
+          if (nameDirectedMatch) {
+            assignee = nameDirectedMatch[1];
+            assigneeIsUser = userLower ? assignee.toLowerCase() === userLower : false;
+          } else if (senderTaskMatch && userLower === msg.sender.toLowerCase()) {
+            assignee = msg.sender;
+            assigneeIsUser = true;
+          }
         }
 
         // Only create action item if we have an explicit assignee
-        if (!assignee) {
-          continue;
-        }
+        if (assignee) {
+          const dateMatches = extractDates(text);
+          const deadline = dateMatches.length > 0 ? dateMatches[0] : undefined;
 
-        // Extract deadline from the message
-        const dateMatches = extractDates(text);
-        const deadline = dateMatches.length > 0 ? dateMatches[0] : undefined;
-
-        const key = text.slice(0, 50) + assignee;
-        if (!seenAction.has(key) && (assigneeIsUser || !userLower || hasMention)) {
-          seenAction.add(key);
-          actions.push({
-            id: nextId(),
-            task: text.length > 150 ? text.slice(0, 147) + '…' : text,
-            assignee,
-            assigneeIsUser,
-            deadline,
-            snippet: highlightSnippet(msg),
-            sender: msg.sender,
-            timestamp: msg.timestamp,
-            confidence: actionMatch.source.includes('please') || actionMatch.source.includes('need') || actionMatch.source.includes('assign')
-              ? 'explicit'
-              : 'inferred',
-          });
+          const key = text.slice(0, 50) + assignee;
+          if (!seenAction.has(key)) {
+            seenAction.add(key);
+            actions.push({
+              id: nextId(),
+              task: text.length > 150 ? text.slice(0, 147) + '…' : text,
+              assignee,
+              assigneeIsUser,
+              deadline,
+              snippet: highlightSnippet(msg),
+              sender: msg.sender,
+              timestamp: msg.timestamp,
+              confidence: actionMatch.source.includes('please') || actionMatch.source.includes('need') || actionMatch.source.includes('assign')
+                ? 'explicit'
+                : 'inferred',
+            });
+          }
         }
       }
     }
@@ -492,7 +550,7 @@ export function analyzeConversation(
         seenDecision.add(key);
         // Try to extract the actual decision
         let decisionText = text;
-        const goWithMatch = text.match(/(?:let'?s go with|we'?l+ go with|going with|we chose|decided (?:on|to))\s+(.+)/i);
+        const goWithMatch = text.match(/(?:let'?s go with|we'?l+ go with|going with|we chose|decided\s+(?:on|to)\s+(?:go with\s+)?)(.+)/i);
         if (goWithMatch) {
           decisionText = goWithMatch[1];
         }
@@ -516,7 +574,7 @@ export function analyzeConversation(
         else if (/reminder|don't forget|remember/i.test(text)) type = 'reminder';
 
         // Build event description
-        let event = text.length > 100 ? text.slice(0, 97) + '…' : text;
+        const event = text.length > 100 ? text.slice(0, 97) + '…' : text;
 
         dates.push({
           id: nextId(),
