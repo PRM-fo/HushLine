@@ -1,5 +1,5 @@
-import { analyzeConversation } from '../core/analyze';
-import { MAX_ANALYSIS_CHARS, MAX_USER_NAME_CHARS } from '../core/limits';
+import { analyzeConversation } from '../core/analyze.js';
+import { MAX_ANALYSIS_CHARS, MAX_USER_NAME_CHARS } from '../core/limits.js';
 import type { AnalyzeApiResponse } from '../api/analyzerProtocol';
 import type { BriefingResult } from '../core/types';
 

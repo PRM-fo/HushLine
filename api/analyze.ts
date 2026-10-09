@@ -1,4 +1,4 @@
-import { handleAnalyzePayload } from '../src/server/analyzeRequest';
+import { handleAnalyzePayload } from '../src/server/analyzeRequest.js';
 import type { VercelRequest, VercelResponse } from '../src/server/vercel';
 
 function getHeader(request: VercelRequest, name: string): string | undefined {

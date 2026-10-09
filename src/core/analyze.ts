@@ -1,12 +1,12 @@
 import type { ActionItem, AnnouncementItem, BriefingResult, DateItem, DecisionItem, ItemStatus, MentionItem, ParsedMessage, UrgentItem } from './types';
-import { parseConversation, isUnsupportedTimestampHeader, isUnattributedLabelLine } from './parser';
-import { extractActions } from './extractors/actions';
-import { extractAnnouncements } from './extractors/announcements';
-import { extractDates } from './extractors/dates';
-import { extractDecisions } from './extractors/decisions';
-import { extractMentions } from './extractors/mentions';
-import { extractUrgency } from './extractors/urgency';
-import { createIdGenerator } from './id';
+import { parseConversation, isUnsupportedTimestampHeader, isUnattributedLabelLine } from './parser.js';
+import { extractActions } from './extractors/actions.js';
+import { extractAnnouncements } from './extractors/announcements.js';
+import { extractDates } from './extractors/dates.js';
+import { extractDecisions } from './extractors/decisions.js';
+import { extractMentions } from './extractors/mentions.js';
+import { extractUrgency } from './extractors/urgency.js';
+import { createIdGenerator } from './id.js';
 
 const URGENCY_MARKERS = [
   /\burgent\b/i,

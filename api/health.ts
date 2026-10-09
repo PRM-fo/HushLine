@@ -1,4 +1,4 @@
-import { ENGINE_VERSION } from '../src/server/analyzeRequest';
+import { ENGINE_VERSION } from '../src/server/analyzeRequest.js';
 import type { VercelRequest, VercelResponse } from '../src/server/vercel';
 
 export default function handler(request: VercelRequest, response: VercelResponse) {
