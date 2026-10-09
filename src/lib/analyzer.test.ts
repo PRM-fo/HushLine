@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeConversation, parseMessages } from './analyzer';
+// @ts-expect-error Node's fs is available in Vitest but Node type declarations are not installed.
+import { readFileSync } from 'node:fs';
+import { analyzeConversation, formatBriefingForClipboard, formatUnparsedLineWarning, parseMessages } from './analyzer';
 
 // Test fixtures — synthetic data for unit testing only.
 // Not displayed in the production app or presented as real conversations.
@@ -150,6 +152,66 @@ describe('parseMessages', () => {
   it('accepts Hindi and Tamil sender names', () => {
     const messages = parseMessages('अमित: नमस्ते\nகுமார்: வணக்கம்');
     expect(messages.map((message) => message.sender)).toEqual(['अमित', 'குமார்']);
+  });
+
+  it.each([
+    ['Rahul (Design) #2', 'I will upload the logo by Friday'],
+    ["O'Brien-Smith", 'Please review the doc ASAP'],
+    ['Priya S.', 'I will fix the bug by 4 PM'],
+    ['Dr. A/B Testing', 'I will send the invoice by Friday'],
+  ])('parses symbol-rich sender %s without including the prefix in message text', (sender, text) => {
+    const [message] = parseMessages(`${sender}: ${text}`);
+    expect(message).toMatchObject({ sender, text });
+    expect(message.text).not.toContain(`${sender}:`);
+  });
+
+  it('keeps symbol-rich sender prefixes out of extracted task text', () => {
+    for (const line of [
+      'Rahul (Design) #2: I will upload the logo by Friday',
+      'Priya S.: I will fix the bug by 4 PM',
+      'Dr. A/B Testing: I will send the invoice by Friday',
+    ]) {
+      const result = analyzeConversation(line);
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0].task).not.toContain(line.split(': ')[0]);
+      expect(result.actions[0].sender).toBe(line.split(': ')[0]);
+    }
+  });
+
+  it('rejects long sentence-like labels as senders', () => {
+    const result = analyzeConversation('Note that: this is a time: 5 PM');
+    expect(result.participants).not.toContain('Note that');
+    expect(result.dates).toEqual([]);
+  });
+
+  it('enforces the sender-label length cap', () => {
+    const longLabel = 'This is a sentence-like label that is clearly longer than fifty characters';
+    const result = analyzeConversation(`${longLabel}: Deadline Wednesday 5 PM`);
+    expect(result.participants).not.toContain(longLabel);
+    expect(result.unparsedLineCount).toBe(1);
+    expect(result.dates).toEqual([]);
+  });
+
+  it('formats a clear supported-format warning for unrecognized lines', () => {
+    expect(formatUnparsedLineWarning(2)).toBe(
+      "2 lines weren't recognized as messages. Supported: Name: message, WhatsApp Android, WhatsApp iOS."
+    );
+  });
+
+  it('declares a restrictive CSP compatible with the built worker and inline styles', () => {
+    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+    expect(html).toMatch(/script-src 'self'/);
+    expect(html).toMatch(/style-src 'self' 'unsafe-inline'/);
+    expect(html).toMatch(/connect-src 'none'/);
+    expect(html).toMatch(/worker-src 'self' blob:/);
+  });
+
+  it('documents the English-only extractor, unsupported chat exports, and source network scope', () => {
+    const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
+    expect(readme).toMatch(/English-only/i);
+    expect(readme).toMatch(/Telegram.*Slack.*unsupported/i);
+    expect(readme).toMatch(/no network calls in the source/i);
+    expect(readme).not.toMatch(/100% private|verified local-only/i);
   });
 });
 
@@ -375,11 +437,15 @@ describe('analyzeConversation — edge cases', () => {
       expect(result.decisions.length).toBe(0);
     });
 
-    it('does not treat rejected proposals as decisions', () => {
+    it('records rejected options without claiming they were chosen', () => {
       const result = analyzeConversation(
         'Alice: We rejected React\nBob: Let\'s not go with Vue\nCara: We decided against Angular'
       );
-      expect(result.decisions).toEqual([]);
+      expect(result.decisions.flatMap((decision) => decision.rejectedOptions)).toEqual([
+        'React',
+        'Vue',
+        'Angular',
+      ]);
     });
 
     it('treats confirmed decisions as decisions', () => {
@@ -437,12 +503,13 @@ describe('analyzeConversation — edge cases', () => {
       expect(result.actions[0]).toMatchObject({ assignee: 'Priya', assigneeIsUser: true });
     });
 
-    it.each([
-      'Alice: Please send the report by Friday',
-      'Alice: Please submit the final word count by Friday',
-    ])('does not treat polite task wording as an assignee: %s', (message) => {
+    it('keeps a polite request unassigned rather than treating a polite word as a name', () => {
+      const message = 'Alice: Please send the report by Friday';
       const result = analyzeConversation(message, 'Alex');
-      expect(result.actions).toEqual([]);
+      expect(result.actions).toContainEqual(expect.objectContaining({
+        assignee: 'Unassigned',
+        task: 'send the report',
+      }));
     });
 
     it('matches name-directed assignees against known conversation participants', () => {
@@ -478,12 +545,13 @@ describe('analyzeConversation — edge cases', () => {
       }));
     });
 
-    it('does not assign unaddressed requests or use polite words as names', () => {
+    it('does not assign generic requests or use polite words as names', () => {
       const result = analyzeConversation(
         'Sarah: Can you send the invoice?\nBob: Please send the report\nCara: Please submit the final word count by Friday',
         'Alex'
       );
-      expect(result.actions).toEqual([]);
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0]).toMatchObject({ assignee: 'Unassigned', task: 'send the report' });
     });
 
     it('recognizes @Bob as an assignee without marking it as the user', () => {
@@ -523,7 +591,7 @@ describe('analyzeConversation — edge cases', () => {
       }));
 
       const rejectedOnly = analyzeConversation("Sarah: I don't agree, let's not go with React");
-      expect(rejectedOnly.decisions).toEqual([]);
+      expect(rejectedOnly.decisions.flatMap((decision) => decision.rejectedOptions)).toContain('React');
 
       const tentative = analyzeConversation("Sarah: Let's go with Vue if the client approves");
       expect(tentative.decisions).toContainEqual(expect.objectContaining({
@@ -632,6 +700,106 @@ describe('analyzeConversation — edge cases', () => {
         'Alice: Event 03/04/2026\nBob: Deadline 31/02/2026\nCara: Deadline 13/13/2026'
       );
       expect(result.dates.map((date) => date.date)).toEqual(['03/04/2026']);
+    });
+
+    it.each([
+      ['Sam: Deadline: Wednesday at 5 PM.', 'Wednesday at 5 PM'],
+      ['Sam: Please submit by Wednesday 5 PM.', 'by Wednesday 5 PM'],
+      ['Sam: Thursday at 11 AM.', 'Thursday at 11 AM'],
+      ['Sam: Finish before Friday noon.', 'before Friday noon'],
+      ['Sam: final reminder: deadline is Wednesday 5 PM.', 'Wednesday 5 PM'],
+    ])('preserves weekday when extracting a date from %s', (message, expectedDate) => {
+      const result = analyzeConversation(message);
+      expect(result.dates.map((date) => date.date)).toContain(expectedDate);
+    });
+
+    it('does not extract items from unsupported Telegram and Slack header lines', () => {
+      for (const line of ['Priya, [12.10.2026 21:15]', 'Priya  9:15 PM']) {
+        const result = analyzeConversation(line);
+        expect(result.unparsedLineCount).toBeGreaterThan(0);
+        expect(result.dates).toEqual([]);
+        expect(result.actions).toEqual([]);
+        expect(result.urgent).toEqual([]);
+      }
+
+      const afterChatMessage = analyzeConversation('Alice: Hello\nPriya, [12.10.2026 21:15]');
+      expect(afterChatMessage.unparsedLineCount).toBe(1);
+      expect(afterChatMessage.dates).toEqual([]);
+    });
+
+    it('combines tomorrow and a clock time into one date and action deadline', () => {
+      const result = analyzeConversation('Priya: I will fix the registration bug by tomorrow 4 PM');
+      expect(result.dates.map((date) => date.date)).toEqual(['tomorrow 4 PM']);
+      expect(result.actions[0]?.deadline).toBe('tomorrow 4 PM');
+    });
+
+    it('copies every briefing category and groups tasks by assignee', () => {
+      const result = analyzeConversation(
+        'Alex: Deadline is Friday\n' +
+        'Sarah: @Alex please review the doc\n' +
+        'Priya: TODO: fix the page\n' +
+        'Sarah: We are not going with React; we are going with Vue instead.\n' +
+        'Sarah: Please note the meeting is tomorrow\n' +
+        'Sarah: Heads up, the room changed\n' +
+        'Sarah: @Alex the review is due Friday',
+        'Alex'
+      );
+      const copied = formatBriefingForClipboard(result, 'Alex');
+      expect(copied).toContain('Summary:');
+      expect(copied).toContain('Urgent:');
+      expect(copied).toContain('Actions grouped by assignee:');
+      expect(copied).toContain('Alex');
+      expect(copied).toContain('Unassigned');
+      expect(copied).toContain('Decisions (confirmed):');
+      expect(copied).toContain('Going with Vue (rejected: React)');
+      expect(copied).toContain('Dates:');
+      expect(copied).toContain('Announcements:');
+      expect(copied).toContain('Mentions:');
+      expect(copied.indexOf('\nAlex:')).toBeLessThan(copied.indexOf('\nUnassigned:'));
+    });
+
+    it('marks question-like dates as tentative', () => {
+      const result = analyzeConversation('Sam: Maybe we should launch on Friday?');
+      expect(result.dates).toContainEqual(expect.objectContaining({
+        date: 'on Friday',
+        status: 'tentative',
+      }));
+    });
+
+    it('extracts only affirmative decision text and isolates rejected options', () => {
+      const result = analyzeConversation('Sam: We are not going with React; we are going with Vue instead.');
+      expect(result.decisions).toContainEqual(expect.objectContaining({
+        decision: 'Going with Vue',
+        rejectedOptions: ['React'],
+      }));
+    });
+
+    it('records an option rejected in a non-agreement message', () => {
+      const result = analyzeConversation("Sam: I don't agree; let's not go with React.");
+      expect(result.decisions).toContainEqual(expect.objectContaining({
+        rejectedOptions: ['React'],
+      }));
+    });
+
+    it('creates unassigned TODO and polite-request actions, and tentative name-directed requests', () => {
+      const todo = analyzeConversation('TODO: fix the registration page.');
+      expect(todo.actions).toContainEqual(expect.objectContaining({
+        assignee: 'Unassigned',
+        task: 'fix the registration page',
+      }));
+
+      const please = analyzeConversation('Please send the report by Friday.');
+      expect(please.actions).toContainEqual(expect.objectContaining({
+        assignee: 'Unassigned',
+        task: 'send the report',
+        deadline: 'by Friday',
+      }));
+
+      const directed = analyzeConversation('Bob, can you send the invoice?');
+      expect(directed.actions).toContainEqual(expect.objectContaining({
+        assignee: 'Bob',
+        status: 'tentative',
+      }));
     });
 
     it('handles Unicode sender names', () => {

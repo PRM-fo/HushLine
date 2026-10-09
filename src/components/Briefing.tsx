@@ -15,7 +15,7 @@ import {
   RefreshCw,
   ChevronDown,
 } from 'lucide-react';
-import type { BriefingResult } from '@/lib/analyzer';
+import { formatBriefingForClipboard, formatUnparsedLineWarning, type BriefingResult } from '@/lib/analyzer';
 
 interface BriefingProps {
   result: BriefingResult;
@@ -201,7 +201,7 @@ export function Briefing({ result, userName, onReset, analysisScope }: BriefingP
   });
 
   const copySummary = async () => {
-    const text = `HUSHLINE BRIEFING\n\nSummary: ${result.summary}\n\nUrgent:\n${result.urgent.map((u) => `- ${u.title}`).join('\n')}\n\nActions for ${userName || 'you'}:\n${userActions.map((a) => `- ${a.task}${a.deadline ? ` (due: ${a.deadline})` : ''}`).join('\n')}\n\nDecisions:\n${result.decisions.map((d) => `- ${d.decision}`).join('\n')}\n\nDates:\n${result.dates.map((d) => `- ${d.date}: ${d.event}`).join('\n')}\n\nMentions:\n${result.mentions.map((m) => `- @${m.mentionedUser}: ${m.context}`).join('\n')}`;
+    const text = formatBriefingForClipboard(result, userName);
     try {
       await navigator.clipboard.writeText(text);
       setCopiedSummary(true);
@@ -266,7 +266,7 @@ export function Briefing({ result, userName, onReset, analysisScope }: BriefingP
           <div className="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100" role="status" aria-live="polite">
             {result.unparsedLineCount > 0 && (
               <p>
-                {result.unparsedLineCount} of {result.totalLineCount} non-empty input lines could not be attributed to a sender; review the pasted text for unsupported formatting.
+                {formatUnparsedLineWarning(result.unparsedLineCount)}
               </p>
             )}
             {result.ignoredSystemLineCount > 0 && (
@@ -472,6 +472,11 @@ export function Briefing({ result, userName, onReset, analysisScope }: BriefingP
                       </div>
                       <div className="flex-1">
                         <p className="text-text-main font-medium leading-snug">{item.decision}</p>
+                        {item.rejectedOptions.length > 0 && (
+                          <p className="mt-1 text-sm text-text-muted">
+                            Rejected options: {item.rejectedOptions.join(', ')}
+                          </p>
+                        )}
                         <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
                       </div>
                     </div>

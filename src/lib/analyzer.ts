@@ -137,7 +137,7 @@ const ACTION_VERBS = [
   /\bassign(?:ed)?\s+(?:to\s+)?(?:you|@?\w+)\b/i,
   /\b(?:you|@?\w+)\s+(?:should|need to|have to|must)\b/i,
   /\b(?:your|@?\w+'s)\s+(?:turn|responsibility|job|task)\b/i,
-  /\b(?:take care of|handle|prepare|finish|complete|submit|send|post|update|write|create|review|check|book|reserve|order)\b/i,
+  /\b(?:take care of|handle|prepare|finish|complete|submit|send|post|update|write|create|review|check|book|reserve|order|fix)\b/i,
 ];
 
 const TASK_VERB_SOURCE =
@@ -202,10 +202,12 @@ const CASUAL_MARKERS = [
 
 // Day/Date extraction patterns
 const DATE_PATTERNS: RegExp[] = [
-  /\b(?:by|before|on|due|deadline(?:\s+is)?(?:\s+by)?)\s+(?:this\s+|next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
+  /\bdeadline(?:\s+is)?(?:\s+by)?\s+(?:(?:this|next)\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:at\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight))?\b/gi,
+  /\b(?:(?:by|before|on|due)\s+)?(?:this\s+|next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:at\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight))?\b/gi,
   /\b(?:by|before|on|due)\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi,
   /\b(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?)(?:\s*,?\s*\d{4})?\b/gi,
   /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g,
+  /\b(?:today|tomorrow|tonight)(?:\s+(?:at\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight))\b/gi,
   /\b(?:today|tomorrow|tonight|this (?:morning|afternoon|evening|week|weekend))\b/gi,
   /\bnext week\b/gi,
   /\bend of (?:day|week|class|tomorrow)\b/gi,
@@ -266,7 +268,7 @@ const MESSAGE_LINE_FORMATS = [
     }),
   },
   {
-    pattern: /^([^:]{1,80}?)\s*(?:\[(.*?)\]|\((.*?)\))?\s*:\s+(.+)$/,
+    pattern: /^(.{1,50}?)(?:\s+\[(.*?)\]|\s+\((.*?)\))?:\s+(.+)$/,
     map: (match: RegExpMatchArray) => ({
       sender: match[1].trim(),
       timestamp: match[2] || match[3] || undefined,
@@ -278,7 +280,7 @@ const MESSAGE_LINE_FORMATS = [
   map: (match: RegExpMatchArray) => { sender: string; timestamp?: string; text: string };
 }>;
 
-const NAME_LABEL_PATTERN = /^[\p{L}\p{M}\p{N}]+(?:[ '\u2019-][\p{L}\p{M}\p{N}]+){0,2}$/u;
+const NAME_LABEL_PATTERN = /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N} .#/'\u2019()-]{0,49}$/u;
 const SYSTEM_TIMESTAMP_PATTERN =
   /^\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\s+-\s+(.+)$/i;
 const INLINE_TIMESTAMP_PATTERN =
@@ -304,7 +306,7 @@ export function parseConversation(raw: string): ParseResult {
   const labelCounts = new Map<string, number>();
   const seenSenders = new Set<string>();
   for (const line of lines) {
-    const match = line.match(/^([^:]{1,80}):\s*(.*)$/);
+    const match = line.match(/^(.{1,50}):\s*(.*)$/);
     if (match && NAME_LABEL_PATTERN.test(match[1].trim())) {
       const label = match[1].trim().toLocaleLowerCase();
       labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
@@ -348,18 +350,34 @@ export function parseConversation(raw: string): ParseResult {
       continue;
     }
 
+    if (isUnsupportedTimestampHeaderLine(line)) {
+      flushBuffer();
+      currentSender = '';
+      currentTimestamp = undefined;
+      unparsedLineCount += 1;
+      messages.push({
+        id: messages.length + 1,
+        messageIndex: messages.length + 1,
+        sender: 'Unknown',
+        text: line,
+        raw: line,
+      });
+      continue;
+    }
+
     if (parsed) {
       const normalizedLabel = parsed.sender.toLocaleLowerCase();
       const startsLikeTimestamp = INLINE_TIMESTAMP_PATTERN.test(parsed.sender);
       const isPlausibleSender = NAME_LABEL_PATTERN.test(parsed.sender);
       const isKnownSender = seenSenders.has(normalizedLabel);
       const appearsRepeated = (labelCounts.get(normalizedLabel) ?? 0) >= 2;
+      const hasDistinctiveNamePunctuation = /[().#/'\u2019]/.test(parsed.sender);
       const isSingleName = (isUncasedWord(parsed.sender) ||
         /^[\p{Lu}][\p{Ll}\p{M}'\u2019-]*$/u.test(parsed.sender)) &&
         !/^(?:\d{1,2}(?:st|nd|rd|th)?\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{1,2}(?:st|nd|rd|th)?)\b/i.test(parsed.text);
 
       if (!isTimestampedFormat && !startsLikeTimestamp &&
-        (!isPlausibleSender || (!isKnownSender && !appearsRepeated && !isSingleName))) {
+        (!isPlausibleSender || (!isKnownSender && !appearsRepeated && !isSingleName && !hasDistinctiveNamePunctuation))) {
         if (currentSender) {
           buffer.push(line);
           rawBuffer.push(line);
@@ -438,12 +456,32 @@ function isSystemMessage(text: string): boolean {
   return SYSTEM_LINE_PATTERNS.some((pattern) => pattern.test(text));
 }
 
+function isUnsupportedTimestampHeaderLine(line: string): boolean {
+  return /^[^,]{1,50},\s*\[\d{1,2}[./]\d{1,2}[./]\d{2,4}\s+\d{1,2}:\d{2}\]$/.test(line) ||
+    /^[\p{L}\p{N}][\p{L}\p{N} .'-]{0,49}\s{2,}\d{1,2}:\d{2}\s*(?:AM|PM)?$/iu.test(line);
+}
+
 function isUncasedWord(value: string): boolean {
   return !/[\p{Lu}\p{Ll}]/u.test(value) && /^[\p{L}\p{M}'\u2019-]+$/u.test(value);
 }
 
+function isUnsupportedTimestampHeader(message: ParsedMessage): boolean {
+  return message.sender === 'Unknown' && isUnsupportedTimestampHeaderLine(message.text);
+}
+
+function isUnattributedLabelLine(message: ParsedMessage): boolean {
+  return message.sender === 'Unknown' &&
+    /:\s/.test(message.text) &&
+    !/^\s*TODO\s*:/i.test(message.text) &&
+    !/^\s*please\b/i.test(message.text);
+}
+
 export function parseMessages(raw: string): ParsedMessage[] {
   return parseConversation(raw).messages;
+}
+
+export function formatUnparsedLineWarning(lineCount: number): string {
+  return `${lineCount} lines weren't recognized as messages. Supported: Name: message, WhatsApp Android, WhatsApp iOS.`;
 }
 
 function extractDates(text: string): string[] {
@@ -451,7 +489,10 @@ function extractDates(text: string): string[] {
   for (const pattern of DATE_PATTERNS) {
     pattern.lastIndex = 0;
     for (const match of text.matchAll(pattern)) {
-      const value = match[0].trim();
+      const value = match[0]
+        .trim()
+        .replace(/[.,;!?]+$/, '')
+        .replace(/^deadline(?:\s+is)?(?:\s+by)?\s+/i, '');
       if (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value)) {
         const [first, second, yearText] = value.split('/').map(Number);
         if (value === '24/7') continue;
@@ -532,20 +573,29 @@ function findNameDirectedAssignee(text: string, names: string[]): string | undef
 }
 
 function getDecisionClauses(text: string): Array<{ decision: string; rejectedOptions: string[]; status: ItemStatus }> {
-  const clauses = text.split(/[,;]|\bbut\b/i).map((clause) => clause.trim()).filter(Boolean);
+  const clauses = text.split(/[,;.]|\bbut\b/i).map((clause) => clause.trim()).filter(Boolean);
   const rejectedOptions = [...text.matchAll(
-    /\b(?:not going with|not to go with|decided against|rejected|ruled out|vetoed)\s+([^,.!?]+)/gi
+    /\b(?:not going with|not to go with|let'?s not go with|decided against|rejected|ruled out|vetoed)\s+([^,.;!?]+)/gi
   )].map((match) => match[1].trim());
   const decisions: Array<{ decision: string; rejectedOptions: string[]; status: ItemStatus }> = [];
   for (const clause of clauses) {
+    const affirmativeMatch = clause.match(/\b(?:we are|we're)\s+going with\s+([^,.!?]+?)(?:\s+instead)?$/i);
     const rejected = NON_DECISION_MARKERS.some((pattern) => pattern.test(clause)) ||
       /\b(?:not|never)\s+(?:going|go|choose|use|select|adopt)\b/i.test(clause);
-    if (rejected || !matchesAny(clause, DECISION_MARKERS)) continue;
+    if (rejected || (!matchesAny(clause, DECISION_MARKERS) && !affirmativeMatch)) continue;
 
+    const decision = affirmativeMatch ? `Going with ${affirmativeMatch[1].trim()}` : clause;
     decisions.push({
-      decision: clause,
+      decision,
       rejectedOptions: [...rejectedOptions],
       status: isTentative(clause) ? 'tentative' : 'confirmed',
+    });
+  }
+  if (decisions.length === 0 && rejectedOptions.length > 0) {
+    decisions.push({
+      decision: '',
+      rejectedOptions,
+      status: isTentative(text) ? 'tentative' : 'confirmed',
     });
   }
   return decisions;
@@ -576,6 +626,7 @@ export function analyzeConversation(
 
   for (const msg of messages) {
     const text = msg.text;
+    if (isUnsupportedTimestampHeader(msg) || isUnattributedLabelLine(msg)) continue;
 
     // Skip pure casual messages for everything except explicit @mentions
     const casual = isCasual(text);
@@ -631,7 +682,15 @@ export function analyzeConversation(
           }
         }
 
-        // Only create action item if we have an explicit assignee
+        const hasUnassignedInstruction =
+          /^\s*TODO\s*:/i.test(text) ||
+          /^\s*please\s+send\b/i.test(text);
+        const unnamedRequest = text.match(
+          /^\s*([\p{Lu}][\p{L}\p{M}'\u2019-]*)\s*,\s*(?:can|could)\s+you\s+/u
+        );
+        if (!assignee && unnamedRequest) assignee = unnamedRequest[1];
+        if (!assignee && hasUnassignedInstruction) assignee = 'Unassigned';
+
         if (assignee) {
           const dateMatches = extractDates(text);
           const deadline = dateMatches.length > 0 ? dateMatches[0] : undefined;
@@ -639,10 +698,18 @@ export function analyzeConversation(
           const key = text.slice(0, 50) + assignee;
           if (!seenAction.has(key)) {
             seenAction.add(key);
+            let task = text
+              .replace(/^\s*TODO\s*:\s*/i, '')
+              .replace(/^\s*please\s+/i, '')
+              .replace(/^\s*[\p{Lu}][\p{L}\p{M}'\u2019-]*\s*,\s*(?:can|could)\s+you\s+/iu, '');
+            if (deadline) task = task.replace(deadline, '');
+            task = task
+              .replace(/[.!?]+\s*$/, '')
+              .trim();
             actions.push({
               id: nextId(),
               messageIndex: msg.messageIndex,
-              task: text.length > 150 ? text.slice(0, 147) + '…' : text,
+              task: task.length > 150 ? task.slice(0, 147) + '…' : task,
               assignee,
               assigneeIsUser,
               deadline,
@@ -661,11 +728,12 @@ export function analyzeConversation(
     }
 
     // --- DECISIONS ---
-    if (!casual && matchesAny(text, DECISION_MARKERS)) {
+    const decisionClauses = getDecisionClauses(text);
+    if (!casual && decisionClauses.length > 0) {
       const key = text.slice(0, 60);
       if (!seenDecision.has(key)) {
         seenDecision.add(key);
-        for (const clause of getDecisionClauses(text)) {
+        for (const clause of decisionClauses) {
           decisions.push({
             id: nextId(),
             messageIndex: msg.messageIndex,
@@ -797,4 +865,48 @@ export function analyzeConversation(
       second: '2-digit',
     }),
   };
+}
+
+export function formatBriefingForClipboard(result: BriefingResult, userName: string): string {
+  const groups = new Map<string, ActionItem[]>();
+  for (const action of result.actions) {
+    const assignee = action.assignee || 'Unassigned';
+    groups.set(assignee, [...(groups.get(assignee) ?? []), action]);
+  }
+  const orderedAssignees = [...groups.keys()].sort((left, right) => {
+    const leftIsUser = Boolean(userName) && left.toLocaleLowerCase() === userName.trim().toLocaleLowerCase();
+    const rightIsUser = Boolean(userName) && right.toLocaleLowerCase() === userName.trim().toLocaleLowerCase();
+    return Number(rightIsUser) - Number(leftIsUser);
+  });
+  const renderLines = (items: string[]) => items.length > 0 ? items.map((item) => `- ${item}`).join('\n') : '- None';
+  const renderActions = orderedAssignees.length > 0
+    ? orderedAssignees.map((assignee) => (
+      `${assignee}:\n${renderLines((groups.get(assignee) ?? []).map((action) =>
+        `${action.task}${action.deadline ? ` (due: ${action.deadline})` : ''}`
+      ))}`
+    )).join('\n')
+    : 'Unassigned:\n- None';
+  const decisions = (status: ItemStatus) => renderLines(
+    result.decisions
+      .filter((decision) => decision.status === status)
+      .map((decision) => {
+        const selected = decision.decision || 'No confirmed option selected';
+        return decision.rejectedOptions.length > 0
+          ? `${selected} (rejected: ${decision.rejectedOptions.join(', ')})`
+          : selected;
+      })
+  );
+
+  return [
+    'HUSHLINE BRIEFING',
+    '',
+    `Summary:\n${result.summary}`,
+    `Urgent:\n${renderLines(result.urgent.map((item) => item.title))}`,
+    `Actions grouped by assignee:\n${renderActions}`,
+    `Decisions (confirmed):\n${decisions('confirmed')}`,
+    `Decisions (tentative):\n${decisions('tentative')}`,
+    `Dates:\n${renderLines(result.dates.map((item) => `${item.date}: ${item.event} (${item.status})`))}`,
+    `Announcements:\n${renderLines(result.announcements.map((item) => item.title))}`,
+    `Mentions:\n${renderLines(result.mentions.map((item) => `@${item.mentionedUser}: ${item.context}`))}`,
+  ].join('\n\n');
 }
