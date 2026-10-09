@@ -5,7 +5,6 @@ import { ConversationInput } from '@/components/ConversationInput';
 import { Briefing } from '@/components/Briefing';
 import { HowItWorks, Privacy } from '@/components/InfoSections';
 import { Footer } from '@/components/Footer';
-import { analyzeConversation } from '@/lib/analyzer';
 import type { BriefingResult } from '@/lib/analyzer';
 
 export default function App() {
@@ -14,6 +13,7 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<BriefingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [analysisScope, setAnalysisScope] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLDivElement>(null);
   const briefingRef = useRef<HTMLDivElement>(null);
@@ -38,28 +38,41 @@ export default function App() {
     }, 50);
   }, [result]);
 
-  const handleAnalyze = useCallback(() => {
-    if (conversation.trim().length < 20) {
+  const handleAnalyze = useCallback((input: string, scope?: string) => {
+    if (input.trim().length < 20) {
       setError('Please paste at least 20 characters of conversation.');
       return;
     }
 
     setError(null);
     setIsProcessing(true);
-
-    // Analysis is synchronous - no artificial delay
+    setAnalysisScope(scope ?? null);
     try {
-      const analysis = analyzeConversation(conversation, userName.trim() || undefined);
-      setResult(analysis);
-      setIsProcessing(false);
-      setTimeout(() => {
-        briefingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 50);
-    } catch {
-      setError('Something went wrong while analyzing. Please try again.');
+      const worker = new Worker(new URL('./lib/analyzer.worker.ts', import.meta.url), { type: 'module' });
+      worker.onmessage = (event: MessageEvent<{ result: BriefingResult }>) => {
+        worker.terminate();
+        setResult(event.data.result);
+        setIsProcessing(false);
+        setTimeout(() => {
+          briefingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+      };
+      worker.onerror = (event) => {
+        worker.terminate();
+        setError(`Analysis failed${event.message ? `: ${event.message}` : '. Please try again.'}`);
+        setIsProcessing(false);
+      };
+      worker.onmessageerror = () => {
+        worker.terminate();
+        setError('Analysis returned data the page could not read. Please try again.');
+        setIsProcessing(false);
+      };
+      worker.postMessage({ raw: input, userName: userName.trim() || undefined });
+    } catch (cause) {
+      setError(`Unable to start analysis: ${cause instanceof Error ? cause.message : 'Please try again.'}`);
       setIsProcessing(false);
     }
-  }, [conversation, userName]);
+  }, [userName]);
 
   const handleClear = useCallback(() => {
     setConversation('');
@@ -69,6 +82,7 @@ export default function App() {
   const handleReset = useCallback(() => {
     setError(null);
     setResult(null);
+    setAnalysisScope(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
@@ -98,7 +112,7 @@ export default function App() {
 
         {result && (
           <div ref={briefingRef}>
-            <Briefing result={result} userName={userName} onReset={handleReset} />
+            <Briefing result={result} userName={userName} onReset={handleReset} analysisScope={analysisScope} />
           </div>
         )}
 

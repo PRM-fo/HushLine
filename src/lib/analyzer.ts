@@ -331,8 +331,12 @@ function extractDates(text: string): string[] {
     for (const match of text.matchAll(pattern)) {
       const value = match[0].trim();
       if (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value)) {
-        const [month, day] = value.split('/').map(Number);
-        if (value === '24/7' || month < 1 || month > 12 || day < 1 || day > 31) continue;
+        const [first, second, yearText] = value.split('/').map(Number);
+        if (value === '24/7') continue;
+        const day = first > 12 ? first : second;
+        const month = first > 12 ? second : first;
+        const year = yearText === undefined ? 2000 : yearText < 100 ? yearText + 2000 : yearText;
+        if (month < 1 || month > 12 || day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate()) continue;
         if (/\b(?:fraction|ratio|divided by|out of)\b/i.test(text)) continue;
       }
       found.push(value);
@@ -374,6 +378,26 @@ function highlightSnippet(message: ParsedMessage, keyword?: string): string {
       .join('');
   }
   return message.text;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function findNameDirectedAssignee(text: string, names: string[]): string | undefined {
+  const reservedNames = new Set(['please', 'can', 'could', 'would', 'will', 'should', 'someone']);
+  const candidates = [...new Set(names)]
+    .filter((name) => name && !reservedNames.has(name.toLowerCase()))
+    .sort((a, b) => b.length - a.length);
+
+  for (const name of candidates) {
+    const pattern = new RegExp(
+      `^\\s*(?:please\\s*,?\\s+)?@?${escapeRegExp(name)}(?:,\\s*|\\s+)(?:please\\s+)?${TASK_VERB_SOURCE}\\b`,
+      'iu'
+    );
+    if (pattern.test(text)) return name;
+  }
+  return undefined;
 }
 
 function summarizeMessages(messages: ParsedMessage[], participants: string[]): string {
@@ -461,6 +485,7 @@ export function analyzeConversation(
   const seenDecision = new Set<string>();
   const seenAction = new Set<string>();
   const seenMention = new Set<string>();
+  const urgentTexts = new Set<string>();
 
   for (const msg of messages) {
     const text = msg.text;
@@ -485,6 +510,7 @@ export function analyzeConversation(
             ? 'high'
             : 'medium',
         });
+        urgentTexts.add(text);
       }
     }
 
@@ -504,12 +530,10 @@ export function analyzeConversation(
           assignee = msg.sender;
           assigneeIsUser = userLower ? msg.sender.toLowerCase() === userLower : false;
         } else {
-          const nameDirectedMatch = text.match(
-            new RegExp(`^\\s*(?:please\\s+)?([\\p{L}][\\p{L}'’-]{0,30}),?\\s+(?:please\\s+)?${TASK_VERB_SOURCE}\\b`, 'iu')
-          );
+          const nameDirectedAssignee = findNameDirectedAssignee(text, [...participants, userName ?? '']);
           const senderTaskMatch = new RegExp(`^\\s*(?:please\\s+)?${TASK_VERB_SOURCE}\\b`, 'i').test(text);
-          if (nameDirectedMatch) {
-            assignee = nameDirectedMatch[1];
+          if (nameDirectedAssignee) {
+            assignee = nameDirectedAssignee;
             assigneeIsUser = userLower ? assignee.toLowerCase() === userLower : false;
           } else if (senderTaskMatch && userLower === msg.sender.toLowerCase()) {
             assignee = msg.sender;
@@ -613,7 +637,7 @@ export function analyzeConversation(
     // --- ANNOUNCEMENTS (buried important info) ---
     if (!casual && matchesAny(text, ANNOUNCEMENT_MARKERS)) {
       // Don't duplicate items already in urgent
-      const isAlreadyUrgent = urgent.some((u) => u.snippet === highlightSnippet(msg));
+      const isAlreadyUrgent = urgentTexts.has(text);
       if (!isAlreadyUrgent) {
         announcements.push({
           id: nextId(),

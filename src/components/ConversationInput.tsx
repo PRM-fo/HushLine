@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Eraser, FileText, Loader2, User, Zap } from 'lucide-react';
+import { MAX_ANALYSIS_CHARS, splitConversationIntoChunks } from '@/lib/inputChunks';
 
 interface ConversationInputProps {
   value: string;
   onChange: (value: string) => void;
   userName: string;
   onUserNameChange: (value: string) => void;
-  onAnalyze: () => void;
+  onAnalyze: (text: string, scope?: string) => void;
   onClear: () => void;
   isProcessing: boolean;
   error: string | null;
@@ -26,12 +27,24 @@ export function ConversationInput({
 }: ConversationInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [selectedChunkIndex, setSelectedChunkIndex] = useState(0);
 
   const charCount = value.length;
-  const canAnalyze = charCount >= MIN_CHARS && !isProcessing;
+  const isOversized = charCount > MAX_ANALYSIS_CHARS;
+  const chunks = useMemo(
+    () => (isOversized ? splitConversationIntoChunks(value) : [value]),
+    [isOversized, value]
+  );
+  const activeChunkIndex = Math.min(selectedChunkIndex, chunks.length - 1);
+  const selectedChunk = chunks[activeChunkIndex] ?? '';
+  const canAnalyze = (isOversized ? selectedChunk.length : charCount) >= MIN_CHARS && !isProcessing;
 
   const handleAnalyze = () => {
-    if (canAnalyze) onAnalyze();
+    if (!canAnalyze) return;
+    const scope = isOversized
+      ? `Input chunk ${activeChunkIndex + 1} of ${chunks.length} (${selectedChunk.length.toLocaleString()} characters)`
+      : undefined;
+    onAnalyze(isOversized ? selectedChunk : value, scope);
   };
 
   return (
@@ -126,7 +139,7 @@ export function ConversationInput({
             className={`btn-primary flex-1 sm:flex-initial sm:min-w-[200px] group ${
               !canAnalyze ? 'opacity-40 cursor-not-allowed hover:shadow-none' : ''
             }`}
-            aria-label="Analyze conversation"
+            aria-label={isOversized ? 'Analyze selected input chunk' : 'Analyze conversation'}
           >
             {isProcessing ? (
               <>
@@ -136,18 +149,45 @@ export function ConversationInput({
             ) : (
               <>
                 <Zap className="w-4 h-4 text-midnight-950" />
-                Analyze conversation
+                {isOversized ? 'Analyze selected chunk' : 'Analyze conversation'}
               </>
             )}
           </button>
         </div>
 
         {/* Validation hint */}
-        <p id="input-hint" className="mt-3 text-sm text-text-muted" aria-live="polite" aria-atomic="true">
-          {charCount > 0 && charCount < MIN_CHARS
-            ? `Add at least ${MIN_CHARS} characters to analyze (${MIN_CHARS - charCount} more to go).`
-            : ''}
-        </p>
+        {isOversized ? (
+          <div className="mt-3 space-y-3" role="alert">
+            <p id="input-hint" className="text-sm text-amber-200">
+              This paste has {charCount.toLocaleString()} characters; Hushline analyzes at most {MAX_ANALYSIS_CHARS.toLocaleString()} characters at a time.
+              Your original text is kept unchanged. Select a chunk to analyze it without losing the rest.
+            </p>
+            <label className="flex flex-col gap-1.5 text-sm text-text-muted sm:max-w-sm">
+              Input chunk
+              <select
+                value={activeChunkIndex}
+                onChange={(event) => setSelectedChunkIndex(Number(event.target.value))}
+                className="input-field"
+                disabled={isProcessing}
+              >
+                {chunks.map((chunk, index) => (
+                  <option key={index} value={index}>
+                    Chunk {index + 1} of {chunks.length} — {chunk.length.toLocaleString()} characters
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="text-xs text-text-muted">
+              Chunks keep line breaks together when possible. Very long individual lines may be split.
+            </p>
+          </div>
+        ) : (
+          <p id="input-hint" className="mt-3 text-sm text-text-muted" aria-live="polite" aria-atomic="true">
+            {charCount > 0 && charCount < MIN_CHARS
+              ? `Add at least ${MIN_CHARS} characters to analyze (${MIN_CHARS - charCount} more to go).`
+              : ''}
+          </p>
+        )}
 
         {/* Error */}
         {error && (
@@ -161,7 +201,7 @@ export function ConversationInput({
           <div className="mt-6 glass-panel p-6 animate-fade-in" role="status" aria-live="polite">
             <div className="flex items-center gap-3">
               <Loader2 className="w-5 h-5 text-primary-300 animate-spin" />
-              <span className="text-sm text-text-muted font-mono">Analyzing your conversation on this device…</span>
+              <span className="text-sm text-text-muted font-mono">Analyzing this input in the background…</span>
             </div>
           </div>
         )}

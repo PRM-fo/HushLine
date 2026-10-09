@@ -184,6 +184,15 @@ describe('analyzeConversation — test fixture (project group chat)', () => {
     expect(hasAttendance).toBe(true);
   });
 
+  it('keeps non-urgent announcements while suppressing announcement duplicates of urgent items', () => {
+    const analysis = analyzeConversation(
+      'Alice: IMPORTANT deadline please note exam Friday\nBob: FYI unrelated update'
+    );
+    expect(analysis.urgent.some((item) => item.snippet.includes('IMPORTANT'))).toBe(true);
+    expect(analysis.announcements.some((item) => item.snippet.includes('IMPORTANT'))).toBe(false);
+    expect(analysis.announcements.some((item) => item.snippet.includes('FYI unrelated'))).toBe(true);
+  });
+
   it('generates a non-empty summary', () => {
     expect(result.summary.length).toBeGreaterThan(50);
     expect(result.summary).toContain('Sarah');
@@ -388,11 +397,47 @@ describe('analyzeConversation — edge cases', () => {
       expect(result.actions[0]).toMatchObject({ assignee: 'Priya', assigneeIsUser: true });
     });
 
+    it.each([
+      'Alice: Please send the report by Friday',
+      'Alice: Please submit the final word count by Friday',
+    ])('does not treat polite task wording as an assignee: %s', (message) => {
+      const result = analyzeConversation(message, 'Alex');
+      expect(result.actions).toEqual([]);
+    });
+
+    it('matches name-directed assignees against known conversation participants', () => {
+      const result = analyzeConversation(
+        'Alice: Hello\nPriya: Here\nBob: Please, Priya, submit the report by Friday',
+        'Priya'
+      );
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0]).toMatchObject({ assignee: 'Priya', assigneeIsUser: true });
+    });
+
     it('does not extract bare numbers, fractions, or 24/7 as dates', () => {
       const result = analyzeConversation(
         'Alice: Meet me at 5\nBob: The ratio is 3/4\nCara: Support is available 24/7'
       );
       expect(result.dates).toEqual([]);
+    });
+
+    it('accepts valid day-first and month-first numeric dates without changing their text', () => {
+      const result = analyzeConversation(
+        'Alice: Deadline 25/12/2026\nBob: Deadline 13/05/2026\nCara: Deadline 12/25/2026\nDrew: Deadline 05/13/2026'
+      );
+      expect(result.dates.map((date) => date.date)).toEqual([
+        '25/12/2026',
+        '13/05/2026',
+        '12/25/2026',
+        '05/13/2026',
+      ]);
+    });
+
+    it('retains ambiguous numeric dates as raw text and rejects impossible dates', () => {
+      const result = analyzeConversation(
+        'Alice: Event 03/04/2026\nBob: Deadline 31/02/2026\nCara: Deadline 13/13/2026'
+      );
+      expect(result.dates.map((date) => date.date)).toEqual(['03/04/2026']);
     });
 
     it('handles Unicode sender names', () => {

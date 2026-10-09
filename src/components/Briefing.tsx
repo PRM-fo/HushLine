@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   AtSign,
@@ -21,6 +21,7 @@ interface BriefingProps {
   result: BriefingResult;
   userName: string;
   onReset: () => void;
+  analysisScope: string | null;
 }
 
 type Category = 'all' | 'urgent' | 'actions' | 'decisions' | 'dates' | 'mentions' | 'announcements';
@@ -42,6 +43,35 @@ const PRIORITIES: { key: Priority; label: string }[] = [
   { key: 'medium', label: 'Medium' },
   { key: 'low', label: 'Low / Info' },
 ];
+
+function ProgressiveList<T>({
+  items,
+  renderItem,
+  className = 'space-y-3',
+}: {
+  items: T[];
+  renderItem: (item: T) => ReactNode;
+  className?: string;
+}) {
+  const [visibleCount, setVisibleCount] = useState(50);
+  const visibleItems = items.slice(0, visibleCount);
+  const remaining = items.length - visibleItems.length;
+
+  return (
+    <div className={className}>
+      {visibleItems.map(renderItem)}
+      {remaining > 0 && (
+        <button
+          type="button"
+          onClick={() => setVisibleCount((count) => count + 50)}
+          className="btn-ghost"
+        >
+          Show next {Math.min(50, remaining)} items ({remaining} remaining)
+        </button>
+      )}
+    </div>
+  );
+}
 
 function PriorityBadge({ level, label }: { level: 'high' | 'medium' | 'explicit' | 'inferred' | 'low'; label: string }) {
   const styles: Record<string, string> = {
@@ -147,7 +177,7 @@ function ActionCard({ item, priorityFilter }: { item: BriefingResult['actions'][
   );
 }
 
-export function Briefing({ result, userName, onReset }: BriefingProps) {
+export function Briefing({ result, userName, onReset, analysisScope }: BriefingProps) {
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [priorityFilter, setPriorityFilter] = useState<Priority>('all');
   const [copiedSummary, setCopiedSummary] = useState(false);
@@ -158,6 +188,17 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
   const otherActions = result.actions.filter((a) => !a.assigneeIsUser);
   const userMentions = result.mentions.filter((m) => m.isUser);
   const otherMentions = result.mentions.filter((m) => !m.isUser);
+  const visibleUrgent = result.urgent.filter(
+    (item) => priorityFilter === 'all' || item.confidence === priorityFilter
+  );
+  const visibleUserActions = userActions.filter((item) => {
+    const priority: Priority = item.confidence === 'explicit' && item.deadline
+      ? 'high'
+      : item.confidence === 'explicit'
+        ? 'medium'
+        : 'low';
+    return priorityFilter === 'all' || priority === priorityFilter;
+  });
 
   const copySummary = async () => {
     const text = `HUSHLINE BRIEFING\n\nSummary: ${result.summary}\n\nUrgent:\n${result.urgent.map((u) => `- ${u.title}`).join('\n')}\n\nActions for ${userName || 'you'}:\n${userActions.map((a) => `- ${a.task}${a.deadline ? ` (due: ${a.deadline})` : ''}`).join('\n')}\n\nDecisions:\n${result.decisions.map((d) => `- ${d.decision}`).join('\n')}\n\nDates:\n${result.dates.map((d) => `- ${d.date}: ${d.event}`).join('\n')}\n\nMentions:\n${result.mentions.map((m) => `- @${m.mentionedUser}: ${m.context}`).join('\n')}`;
@@ -216,6 +257,11 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
           </span>
           <span className="ml-auto text-xs font-mono text-text-muted">at {result.processedAt}</span>
         </div>
+        {analysisScope && (
+          <p className="mb-6 text-sm text-amber-200">
+            This briefing covers {analysisScope}. The full pasted conversation remains in the input.
+          </p>
+        )}
         {copyError && (
           <p className="mb-6 text-sm text-red-300" role="alert" aria-live="assertive">
             {copyError}
@@ -319,11 +365,10 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
             {result.urgent.length === 0 ? (
               <EmptyState text="No urgent items detected. You're in the clear." />
             ) : (
-              <div className="space-y-3">
-                {result.urgent.map((item) => (
-                  <UrgentCard key={item.id} item={item} priorityFilter={priorityFilter} />
-                ))}
-              </div>
+              <ProgressiveList
+                items={visibleUrgent}
+                renderItem={(item) => <UrgentCard key={item.id} item={item} priorityFilter="all" />}
+              />
             )}
           </div>
         )}
@@ -353,23 +398,24 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
             {userActions.length === 0 && otherActions.length === 0 ? (
               <EmptyState text="No tasks detected in this conversation." />
             ) : (
-              <div className="space-y-3">
+              <div>
                 {userActions.length === 0 && (
                   <p className="text-sm text-text-muted mb-3">
                     No tasks were explicitly assigned to {userName || 'you'}. Try adding your name in the input field above.
                   </p>
                 )}
-                {userActions.map((item) => (
-                  <ActionCard key={item.id} item={item} priorityFilter={priorityFilter} />
-                ))}
+                <ProgressiveList
+                  items={visibleUserActions}
+                  renderItem={(item) => <ActionCard key={item.id} item={item} priorityFilter="all" />}
+                />
                 {otherActions.length > 0 && (
                   <details className="mt-4 group">
                     <summary className="flex items-center gap-2 text-sm text-text-muted cursor-pointer hover:text-text-main transition-colors list-none">
                       <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
                       Other tasks ({otherActions.length})
                     </summary>
-                    <div className="mt-3 space-y-3">
-                      {otherActions.map((item) => (
+                    <div className="mt-3">
+                      <ProgressiveList items={otherActions} renderItem={(item) => (
                         <div key={item.id} className="glass-panel p-4 opacity-70">
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <p className="text-text-main text-sm leading-snug">{item.task}</p>
@@ -384,7 +430,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                           )}
                           <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
                         </div>
-                      ))}
+                      )} />
                     </div>
                   </details>
                 )}
@@ -406,8 +452,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
             {result.decisions.length === 0 ? (
               <EmptyState text="No explicit decisions detected in this conversation." />
             ) : (
-              <div className="space-y-3">
-                {result.decisions.map((item) => (
+              <ProgressiveList items={result.decisions} renderItem={(item) => (
                   <div key={item.id} className="glass-panel glass-panel-hover p-4 lg:p-5">
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 w-5 h-5 rounded-full bg-primary-500/15 flex items-center justify-center flex-shrink-0">
@@ -419,8 +464,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                )} />
             )}
           </div>
         )}
@@ -438,8 +482,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
             {result.dates.length === 0 ? (
               <EmptyState text="No specific dates or deadlines detected." />
             ) : (
-              <div className="grid sm:grid-cols-2 gap-3">
-                {result.dates.map((item) => (
+              <ProgressiveList items={result.dates} className="grid sm:grid-cols-2 gap-3" renderItem={(item) => (
                   <div key={item.id} className="glass-panel glass-panel-hover p-4 lg:p-5">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <DateBadge type={item.type} />
@@ -448,8 +491,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                     <p className="text-sm text-text-main leading-snug">{item.event}</p>
                     <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
                   </div>
-                ))}
-              </div>
+                )} />
             )}
           </div>
         )}
@@ -473,7 +515,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                     {userMentions.length} message{userMentions.length > 1 ? 's' : ''} mention{userMentions.length > 1 ? '' : 's'} {userName || 'you'} directly.
                   </p>
                 )}
-                {userMentions.map((item) => (
+                <ProgressiveList items={userMentions} renderItem={(item) => (
                   <div key={item.id} className="glass-panel glass-panel-hover p-4 lg:p-5 border-l-2 border-l-primary-500/40">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <p className="text-text-main font-medium leading-snug">{item.context}</p>
@@ -481,15 +523,15 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                     </div>
                     <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
                   </div>
-                ))}
+                )} />
                 {otherMentions.length > 0 && (
                   <details className="mt-4 group">
                     <summary className="flex items-center gap-2 text-sm text-text-muted cursor-pointer hover:text-text-main transition-colors list-none">
                       <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
                       Other mentions ({otherMentions.length})
                     </summary>
-                    <div className="mt-3 space-y-3">
-                      {otherMentions.map((item) => (
+                    <div className="mt-3">
+                      <ProgressiveList items={otherMentions} renderItem={(item) => (
                         <div key={item.id} className="glass-panel p-4 opacity-70">
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <p className="text-text-main text-sm leading-snug">{item.context}</p>
@@ -497,7 +539,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                           </div>
                           <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
                         </div>
-                      ))}
+                      )} />
                     </div>
                   </details>
                 )}
@@ -519,8 +561,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
             {result.announcements.length === 0 ? (
               <EmptyState text="No buried announcements detected. Nothing hidden in the noise." />
             ) : (
-              <div className="space-y-3">
-                {result.announcements.map((item) => (
+              <ProgressiveList items={result.announcements} renderItem={(item) => (
                   <div key={item.id} className="glass-panel glass-panel-hover p-4 lg:p-5">
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 w-5 h-5 rounded-full bg-secondary-500/15 flex items-center justify-center flex-shrink-0">
@@ -533,8 +574,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                )} />
             )}
           </div>
         )}
