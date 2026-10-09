@@ -153,9 +153,10 @@ git push -u origin main
 This section accurately documents the AI tools used in building Hushline:
 
 - **Bolt.new**: Used to generate the initial project scaffold and the majority of the application code, including the analyzer engine, React components, styling, and tests. Bolt.new uses AI-assisted code generation.
+- **Devin**: Used for code inspection, auditing, and improvements including removing unused dependencies, updating metadata, and preparing the repository for hackathon submission.
 - **No runtime AI model**: Hushline does not use any AI model at runtime. All conversation analysis is performed by deterministic heuristic pattern matching in the browser. No language model, neural network, or AI API is invoked during processing.
 - **No external AI services**: User conversations are never sent to any external AI service, API, or cloud function. All processing is local.
-- **AI contribution**: Bolt.new's AI assistant contributed the full application architecture, the heuristic extraction patterns, the UI design system, and all React/TypeScript implementation. The human developer reviewed, tested, and refined the output.
+- **AI contribution**: Bolt.new's AI assistant contributed the full application architecture, the heuristic extraction patterns, the UI design system, and all React/TypeScript implementation. Devin assisted with code review and improvements. The human developer reviewed, tested, and refined the output.
 
 ## License
 
