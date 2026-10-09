@@ -550,8 +550,9 @@ describe('analyzeConversation — edge cases', () => {
         'Sarah: Can you send the invoice?\nBob: Please send the report\nCara: Please submit the final word count by Friday',
         'Alex'
       );
-      expect(result.actions).toHaveLength(1);
-      expect(result.actions[0]).toMatchObject({ assignee: 'Unassigned', task: 'send the report' });
+      expect(result.actions).toHaveLength(2);
+      expect(result.actions).toContainEqual(expect.objectContaining({ assignee: 'Unassigned', task: 'send the report' }));
+      expect(result.actions).toContainEqual(expect.objectContaining({ assignee: 'Unassigned', task: 'submit the final word count' }));
     });
 
     it('recognizes @Bob as an assignee without marking it as the user', () => {
@@ -778,6 +779,49 @@ describe('analyzeConversation — edge cases', () => {
       const result = analyzeConversation("Sam: I don't agree; let's not go with React.");
       expect(result.decisions).toContainEqual(expect.objectContaining({
         rejectedOptions: ['React'],
+      }));
+    });
+
+    it('never creates a decision with empty text for a rejected proposal', () => {
+      const result = analyzeConversation("Sam: I don't agree; let's not go with React.");
+      expect(result.decisions.every((item) => item.decision.trim().length > 0)).toBe(true);
+    });
+
+    it.each([
+      ['I will fix the bug by 4 PM', 'I will fix the bug'],
+      ['I will upload the logo by Friday', 'I will upload the logo'],
+    ])('removes dangling deadline prepositions from action task %s', (message, task) => {
+      const result = analyzeConversation(`Sam: ${message}`);
+      expect(result.actions).toContainEqual(expect.objectContaining({ task }));
+    });
+
+    it('does not extract actions from lines without an attributed sender', () => {
+      const result = analyzeConversation('Priya  9:15 PM\nI will fix it by 4 PM');
+      expect(result.unparsedLineCount).toBeGreaterThan(0);
+      expect(result.actions).toEqual([]);
+    });
+
+    it('copies all action assignees, announcements, and tentative statuses with the user first', () => {
+      const result = analyzeConversation(
+        'Alex: Maybe I will send the report by Friday\n' +
+        'Sarah: Please review the doc ASAP\n' +
+        'Sam: Let\'s go with Vue if the client approves.\n' +
+        'Sam: Heads up, the room changed',
+        'Alex'
+      );
+      const copied = formatBriefingForClipboard(result, 'Alex');
+      expect(copied.indexOf('\nAlex:')).toBeLessThan(copied.indexOf('\nUnassigned:'));
+      expect(copied).toContain('[Tentative] Maybe I will send the report');
+      expect(copied).toContain('Please review the doc ASAP');
+      expect(copied).toContain('Announcements:\n- Heads up, the room changed');
+      expect(copied).toContain('Decisions (tentative):\n- [Tentative] Let\'s go with Vue');
+    });
+
+    it('extracts imperative Please requests as unassigned actions without evidence of an assignee', () => {
+      const result = analyzeConversation('Please review the doc ASAP');
+      expect(result.actions).toContainEqual(expect.objectContaining({
+        task: 'review the doc ASAP',
+        assignee: 'Unassigned',
       }));
     });
 

@@ -476,6 +476,18 @@ function isUnattributedLabelLine(message: ParsedMessage): boolean {
     !/^\s*please\b/i.test(message.text);
 }
 
+function isExplicitUnassignedInstruction(text: string): boolean {
+  return /^\s*TODO\s*:/i.test(text) ||
+    new RegExp(`^\\s*please\\s+${TASK_VERB_SOURCE}\\b`, 'i').test(text);
+}
+
+function isExplicitNameDirectedRequest(text: string): boolean {
+  return new RegExp(
+    `^\\s*[\\p{Lu}][\\p{L}\\p{M}'’\\-]*,\\s*(?:can|could)\\s+you\\s+${TASK_VERB_SOURCE}\\b`,
+    'iu'
+  ).test(text);
+}
+
 export function parseMessages(raw: string): ParsedMessage[] {
   return parseConversation(raw).messages;
 }
@@ -593,7 +605,9 @@ function getDecisionClauses(text: string): Array<{ decision: string; rejectedOpt
   }
   if (decisions.length === 0 && rejectedOptions.length > 0) {
     decisions.push({
-      decision: '',
+      decision: rejectedOptions.length === 1
+        ? `Not going with ${rejectedOptions[0]}`
+        : `Rejected: ${rejectedOptions.join(', ')}`,
       rejectedOptions,
       status: isTentative(text) ? 'tentative' : 'confirmed',
     });
@@ -656,7 +670,12 @@ export function analyzeConversation(
     }
 
     // --- ACTIONS ---
-    if (!casual || hasMention) {
+    if (
+      (msg.sender !== 'Unknown' ||
+        isExplicitUnassignedInstruction(text) ||
+        isExplicitNameDirectedRequest(text)) &&
+      (!casual || hasMention)
+    ) {
       const actionMatch = ACTION_VERBS.find((p) => p.test(text));
       if (actionMatch) {
         // Detect assignee - only assign when there's explicit evidence
@@ -682,9 +701,7 @@ export function analyzeConversation(
           }
         }
 
-        const hasUnassignedInstruction =
-          /^\s*TODO\s*:/i.test(text) ||
-          /^\s*please\s+send\b/i.test(text);
+        const hasUnassignedInstruction = isExplicitUnassignedInstruction(text);
         const unnamedRequest = text.match(
           /^\s*([\p{Lu}][\p{L}\p{M}'\u2019-]*)\s*,\s*(?:can|could)\s+you\s+/u
         );
@@ -704,6 +721,7 @@ export function analyzeConversation(
               .replace(/^\s*[\p{Lu}][\p{L}\p{M}'\u2019-]*\s*,\s*(?:can|could)\s+you\s+/iu, '');
             if (deadline) task = task.replace(deadline, '');
             task = task
+              .replace(/\b(?:by|before|on|at|until)\s*$/i, '')
               .replace(/[.!?]+\s*$/, '')
               .trim();
             actions.push({
@@ -882,7 +900,7 @@ export function formatBriefingForClipboard(result: BriefingResult, userName: str
   const renderActions = orderedAssignees.length > 0
     ? orderedAssignees.map((assignee) => (
       `${assignee}:\n${renderLines((groups.get(assignee) ?? []).map((action) =>
-        `${action.task}${action.deadline ? ` (due: ${action.deadline})` : ''}`
+        `${action.status === 'tentative' ? '[Tentative] ' : ''}${action.task}${action.deadline ? ` (due: ${action.deadline})` : ''}`
       ))}`
     )).join('\n')
     : 'Unassigned:\n- None';
@@ -891,9 +909,10 @@ export function formatBriefingForClipboard(result: BriefingResult, userName: str
       .filter((decision) => decision.status === status)
       .map((decision) => {
         const selected = decision.decision || 'No confirmed option selected';
-        return decision.rejectedOptions.length > 0
+        const text = decision.rejectedOptions.length > 0
           ? `${selected} (rejected: ${decision.rejectedOptions.join(', ')})`
           : selected;
+        return `${status === 'tentative' ? '[Tentative] ' : ''}${text}`;
       })
   );
 
