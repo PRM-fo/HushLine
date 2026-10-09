@@ -1,5 +1,5 @@
-import { analyzeConversation } from '@/core';
 import type { AnalyzerRequest, AnalyzerResponse } from './protocol';
+import { handleAnalyzeRequest } from './handleAnalyze';
 
 interface AnalyzerWorkerScope {
   onmessage: ((event: MessageEvent<AnalyzerRequest>) => void) | null;
@@ -9,17 +9,5 @@ interface AnalyzerWorkerScope {
 const workerScope = self as unknown as AnalyzerWorkerScope;
 
 workerScope.onmessage = ({ data }) => {
-  try {
-    workerScope.postMessage({
-      type: 'result',
-      requestId: data.requestId,
-      result: analyzeConversation(data.raw, data.userName),
-    });
-  } catch (cause) {
-    workerScope.postMessage({
-      type: 'error',
-      requestId: data.requestId,
-      message: cause instanceof Error ? cause.message : 'Please try again.',
-    });
-  }
+  workerScope.postMessage(handleAnalyzeRequest(data));
 };
