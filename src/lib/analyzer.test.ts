@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 // @ts-expect-error Node's fs is available in Vitest but Node type declarations are not installed.
 import { readFileSync } from 'node:fs';
 import { analyzeConversation, formatBriefingForClipboard, formatUnparsedLineWarning, parseMessages } from './analyzer';
+import { createIdGenerator } from '@/core/id';
 
 // Test fixtures — synthetic data for unit testing only.
 // Not displayed in the production app or presented as real conversations.
@@ -87,6 +88,21 @@ describe('parseMessages', () => {
       sender: 'Bob',
       text: 'Hi',
       timestamp: '31/12/2020, 22:30',
+    });
+  });
+
+  describe('per-analysis IDs', () => {
+    it('restarts IDs for each analysis and returns identical results for identical input', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-09T10:00:00.000Z'));
+      try {
+        const first = analyzeConversation('Sam: Please submit the report by Friday.');
+        const second = analyzeConversation('Sam: Please submit the report by Friday.');
+        expect(second).toEqual(first);
+        expect(createIdGenerator()()).toBe('item_1');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

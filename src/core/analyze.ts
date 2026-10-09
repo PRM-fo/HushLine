@@ -6,6 +6,7 @@ import { extractDates } from './extractors/dates';
 import { extractDecisions } from './extractors/decisions';
 import { extractMentions } from './extractors/mentions';
 import { extractUrgency } from './extractors/urgency';
+import { createIdGenerator } from './id';
 
 const URGENCY_MARKERS = [
   /\burgent\b/i,
@@ -127,9 +128,6 @@ const EXPLICIT_ACTION_CUES = [
   /\bcan you\b/i,
   /\bcould you\b/i,
 ];
-
-let idCounter = 0;
-const nextId = () => `item_${++idCounter}`;
 
 function getOwnershipTask(
   text: string,
@@ -254,7 +252,7 @@ export function analyzeConversation(
   raw: string,
   userName?: string
 ): BriefingResult {
-  idCounter = 0;
+  const nextId = createIdGenerator();
   const parsedConversation = parseConversation(raw);
   const messages = parsedConversation.messages;
   const participants = [...new Set(messages.map((m) => m.sender))];
