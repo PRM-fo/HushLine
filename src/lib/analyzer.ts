@@ -128,13 +128,22 @@ const DECISION_MARKERS = [
   /\bwe chose\b/i,
   /\bvoted?\b/i,
   /\b unanimous\b/i,
-  /\bokay so\b/i,
   /\bso we'?ll\b/i,
   /\bwe'?l+ use\b/i,
-  /\bthat works\b/i,
-  /\bsounds good\b/i,
-  /\bperfect\b/i,
-  /\bgreat idea\b/i,
+];
+
+// Tentative/question phrases that should NOT be treated as decisions
+const NON_DECISION_MARKERS = [
+  /\bshould we\b/i,
+  /\bdo you want\b/i,
+  /\bwhat if\b/i,
+  /\bmaybe\b/i,
+  /\bpossibly\b/i,
+  /\bconsider\b/i,
+  /\bthink about\b/i,
+  /\bnot sure\b/i,
+  /\buncertain\b/i,
+  /\?\s*$/m, // Ends with question mark
 ];
 
 const ANNOUNCEMENT_MARKERS = [
@@ -153,23 +162,7 @@ const ANNOUNCEMENT_MARKERS = [
 ];
 
 const CASUAL_MARKERS = [
-  /\bhaha\b/i,
-  /\blol\b/i,
-  /\blmao\b/i,
-  /\bomg\b/i,
-  /\byeah\b/i,
-  /\bsure\b/i,
-  /\bok\b/i,
-  /\bcool\b/i,
-  /\bnice\b/i,
-  /\bdope\b/i,
-  /\bsame\b/i,
-  /\bfr\b/i,
-  /\bno? cap\b/i,
-  /\bword\b/i,
-  /\bwow\b/i,
-  /\bahhh?\b/i,
-  /^\s*(?:ok|okay|sure|yeah|yep|yup|no|yay|nice|cool|lol|haha|same|fr|agreed|sounds good|got it|noted)\s*[!.?]*\s*$/i,
+  /^\s*(?:haha|lol|lmao|omg|yeah|sure|ok|okay|cool|nice|dope|same|fr|no? cap|word|wow|ahhh?|yep|yup|no|yay|agreed|sounds good|got it|noted)\s*[!.?]*\s*$/i,
 ];
 
 // Day/Date extraction patterns
@@ -203,6 +196,7 @@ const nextId = () => `item_${++idCounter}`;
  * Parse raw pasted text into individual messages.
  * Supports common chat export formats: "Name: text", "Name [time]: text",
  * "Name (time): text", WhatsApp-style "Name, time - text", and plain lines.
+ * Supports Unicode sender names.
  */
 export function parseMessages(raw: string): ParsedMessage[] {
   const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -226,18 +220,34 @@ export function parseMessages(raw: string): ParsedMessage[] {
   };
 
   // Pattern: "Name: message" or "Name [timestamp]: message" or "Name (timestamp): message"
-  const senderLinePattern = /^([A-Za-z][A-Za-z0-9_\-. ]{0,30}?)\s*(?:\[(.*?)\]|\((.*?)\))?\s*:\s+(.+)$/;
-  // WhatsApp-style: "Name, 12/5/24, 3:45 PM - message" or "Name - message"
-  const whatsappPattern = /^([A-Za-z][A-Za-z0-9_\-. ]{0,30}?),\s+\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4},?\s+\d{1,2}:\d{2}\s*(?:AM|PM)?\s*[-–]\s+(.+)$/i;
+  // Supports Unicode characters in sender names
+  const senderLinePattern = /^([^\s:][^:]{0,50}?)\s*(?:\[(.*?)\]|\((.*?)\))?\s*:\s+(.+)$/;
+  // WhatsApp Android: "Name, date, time - message"
+  const whatsappAndroidPattern = /^([^\s,][^,]{0,50}?),\s+\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4},?\s+\d{1,2}:\d{2}\s*(?:AM|PM)?\s*[-–]\s+(.+)$/i;
+  // WhatsApp iOS: "[date, time] Name: message"
+  const whatsappIosPattern = /^\[\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4},?\s+\d{1,2}:\d{2}\s*(?:AM|PM)?\]\s+([^\s:][^:]{0,50}?):\s+(.+)$/i;
 
   for (const line of lines) {
-    const waMatch = line.match(whatsappPattern);
-    const smMatch = !waMatch ? line.match(senderLinePattern) : null;
+    const waAndroidMatch = line.match(whatsappAndroidPattern);
+    const waIosMatch = line.match(whatsappIosPattern);
+    const smMatch = !waAndroidMatch && !waIosMatch ? line.match(senderLinePattern) : null;
 
-    if (waMatch) {
+    if (waAndroidMatch) {
       flushBuffer();
-      currentSender = waMatch[1].trim();
-      currentText = waMatch[2].trim();
+      currentSender = waAndroidMatch[1].trim();
+      currentText = waAndroidMatch[2].trim();
+      currentTimestamp = undefined;
+      messages.push({
+        id: messages.length + 1,
+        sender: currentSender,
+        text: currentText,
+        raw: line,
+      });
+      buffer = [];
+    } else if (waIosMatch) {
+      flushBuffer();
+      currentSender = waIosMatch[1].trim();
+      currentText = waIosMatch[2].trim();
       currentTimestamp = undefined;
       messages.push({
         id: messages.length + 1,
@@ -290,6 +300,10 @@ function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(text));
 }
 
+function containsNonDecision(text: string): boolean {
+  return NON_DECISION_MARKERS.some((p) => p.test(text));
+}
+
 function highlightSnippet(message: ParsedMessage, keyword?: string): string {
   if (keyword && keyword.length > 0) {
     const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -322,10 +336,10 @@ function summarizeMessages(messages: ParsedMessage[], participants: string[]): s
   if (/\bdeadline\b/i.test(topicWords)) topics.push('a deadline');
   if (/\bsubmi(?:ssion|t)\b/i.test(topicWords)) topics.push('a submission');
   if (/\bproject\b/i.test(topicWords)) topics.push('the project');
-  if (/\bexam\b|quiz|test\b/i.test(topicWords)) topics.push('an exam');
+  if (/\bexam\b|\bquiz\b|\btest\b/i.test(topicWords)) topics.push('an exam');
   if (/\bslide/i.test(topicWords)) topics.push('slides');
-  if (/\breport\b/i.test(topicWords)) topics.push('a report');
-  if (/\bcode|repo|github|git\b/i.test(topicWords)) topics.push('code/repository work');
+  // Removed overly broad "report" pattern - too many false positives
+  if (/\bcode\b|\brepo\b|\bgithub\b/i.test(topicWords)) topics.push('code/repository work');
   if (/\bgrade|grading|rubric/i.test(topicWords)) topics.push('grading details');
 
   const topicStr =
@@ -378,6 +392,8 @@ export function analyzeConversation(
   const messages = parseMessages(raw);
   const participants = [...new Set(messages.map((m) => m.sender))];
   const userLower = userName?.trim().toLowerCase();
+  // Escape username for safe regex use
+  const escapedUserName = userLower ? userLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
 
   const urgent: UrgentItem[] = [];
   const actions: ActionItem[] = [];
@@ -403,14 +419,10 @@ export function analyzeConversation(
       const key = text.slice(0, 60);
       if (!seenUrgent.has(key)) {
         seenUrgent.add(key);
-        const marker = URGENCY_MARKERS.find((p) => p.test(text));
-        const reason = marker
-          ? `Flagged as urgent: "${marker.source.replace(/[\\b]|\\|\(\?:|\(|\)|\?|\+|\[|\]|\{|}/g, '').trim()}"`
-          : 'Contains time-sensitive language';
         urgent.push({
           id: nextId(),
           title: text.length > 120 ? text.slice(0, 117) + '…' : text,
-          reason: reason.charAt(0).toUpperCase() + reason.slice(1),
+          reason: 'Contains time-sensitive or urgent language',
           snippet: highlightSnippet(msg),
           sender: msg.sender,
           timestamp: msg.timestamp,
@@ -425,7 +437,7 @@ export function analyzeConversation(
     if (!casual || hasMention) {
       const actionMatch = ACTION_VERBS.find((p) => p.test(text));
       if (actionMatch) {
-        // Detect assignee
+        // Detect assignee - only assign when there's explicit evidence
         const mentionMatch = text.match(/@(\w+)/);
         let assignee = '';
         let assigneeIsUser = false;
@@ -433,15 +445,20 @@ export function analyzeConversation(
         if (mentionMatch) {
           assignee = mentionMatch[1];
           assigneeIsUser = userLower ? assignee.toLowerCase() === userLower : true;
-        } else if (userLower && new RegExp(`\\b${userLower}\\b`, 'i').test(text)) {
+        } else if (userLower && new RegExp(`\\b${escapedUserName}\\b`, 'i').test(text)) {
           assignee = userName!;
           assigneeIsUser = true;
         } else if (/\b(?:you|your)\b/i.test(text) && userLower) {
           assignee = userName!;
           assigneeIsUser = true;
-        } else if (/(?:I'll|I will)/i.test(text)) {
+        } else if (/(?:I'll|I will)\b/i.test(text)) {
           assignee = msg.sender;
           assigneeIsUser = userLower ? msg.sender.toLowerCase() === userLower : false;
+        }
+
+        // Only create action item if we have an explicit assignee
+        if (!assignee) {
+          continue;
         }
 
         // Extract deadline from the message
@@ -454,7 +471,7 @@ export function analyzeConversation(
           actions.push({
             id: nextId(),
             task: text.length > 150 ? text.slice(0, 147) + '…' : text,
-            assignee: assignee || msg.sender,
+            assignee,
             assigneeIsUser,
             deadline,
             snippet: highlightSnippet(msg),
@@ -469,7 +486,7 @@ export function analyzeConversation(
     }
 
     // --- DECISIONS ---
-    if (!casual && matchesAny(text, DECISION_MARKERS)) {
+    if (!casual && matchesAny(text, DECISION_MARKERS) && !containsNonDecision(text)) {
       const key = text.slice(0, 60);
       if (!seenDecision.has(key)) {
         seenDecision.add(key);

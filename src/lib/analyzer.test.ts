@@ -239,4 +239,71 @@ describe('analyzeConversation — edge cases', () => {
     expect(result.decisions).toEqual([]);
     expect(result.dates).toEqual([]);
   });
+
+  // Regression tests for accuracy bugs
+  describe('regression tests', () => {
+    it('does not incorrectly match "git" in "legit" as a topic', () => {
+      const result = analyzeConversation('Alice: That solution is legit\nBob: Yeah totally', 'Alice');
+      expect(result.summary).not.toContain('code');
+      expect(result.summary).not.toContain('repository');
+    });
+
+    it('does not incorrectly match "git" in "legit" as a topic', () => {
+      const result = analyzeConversation('Alice: That solution is legit\nBob: Yeah totally', 'Alice');
+      expect(result.summary).not.toContain('code');
+      expect(result.summary).not.toContain('repository');
+    });
+
+    it('does not incorrectly match "test" in "latest" as a topic', () => {
+      const result = analyzeConversation('Alice: Here are the latest numbers\nBob: Thanks', 'Alice');
+      expect(result.summary).not.toContain('exam');
+    });
+
+    it('detects urgent deadline even when message contains casual words like "word" or "yeah"', () => {
+      const result = analyzeConversation('Boss: This deadline is due tomorrow, yeah? Word to that.\nAlice: Got it', 'Alice');
+      expect(result.urgent.length).toBeGreaterThan(0);
+      expect(result.urgent.some(u => u.title.toLowerCase().includes('deadline'))).toBe(true);
+    });
+
+    it('detects urgent even when message contains "ok"', () => {
+      const result = analyzeConversation('Boss: Deadline is today, ok?\nAlice: Will do', 'Alice');
+      expect(result.urgent.length).toBeGreaterThan(0);
+    });
+
+    it('does not assign task when no explicit assignee is mentioned', () => {
+      const result = analyzeConversation('Alice: Someone should really do this\nBob: Yeah', 'Alice');
+      expect(result.actions.length).toBe(0);
+    });
+
+    it('does not treat tentative proposals as decisions', () => {
+      const result = analyzeConversation('Alice: Should we go with option A?\nBob: Not sure, maybe', 'Alice');
+      expect(result.decisions.length).toBe(0);
+    });
+
+    it('does not treat questions as decisions', () => {
+      const result = analyzeConversation('Alice: What do you think about the new design?\nBob: Looks good', 'Alice');
+      expect(result.decisions.length).toBe(0);
+    });
+
+    it('treats confirmed decisions as decisions', () => {
+      const result = analyzeConversation('Alice: Let\'s go with option A\nBob: Agreed', 'Alice');
+      expect(result.decisions.length).toBeGreaterThan(0);
+    });
+
+    it('handles Unicode sender names', () => {
+      const result = analyzeConversation('José: Hola amigos\nFrançois: Bonjour', 'Alice');
+      expect(result.participants).toContain('José');
+      expect(result.participants).toContain('François');
+    });
+
+    it('handles regex-special characters in username without crashing', () => {
+      const result = analyzeConversation('Alex: Can you help?\nBob: Sure', 'Alex(');
+      expect(result.messageCount).toBe(2);
+    });
+
+    it('handles C++ username without crashing', () => {
+      const result = analyzeConversation('C++Dev: Need to fix the build\nBob: On it', 'C++');
+      expect(result.messageCount).toBe(2);
+    });
+  });
 });
