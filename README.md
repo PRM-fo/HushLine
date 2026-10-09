@@ -42,28 +42,29 @@ Group chats generate hundreds of messages daily. Most are casual noise, but crit
 
 ## Architecture
 
-```
-src/
-├── App.tsx                      # Root component, state management, orchestration
-├── lib/
-│   ├── analyzer.ts              # Conversation parsing + heuristic extraction engine
-│   └── analyzer.test.ts         # Unit tests for parsing and extraction
-├── components/
-│   ├── Header.tsx               # Fixed navigation header
-│   ├── Hero.tsx                 # Landing hero with animated signal visual
-│   ├── ConversationInput.tsx    # Text input area, username, validation
-│   ├── Briefing.tsx             # Results dashboard with filtering
-│   ├── InfoSections.tsx         # How It Works + Privacy sections
-│   └── Footer.tsx               # Footer
-└── index.css                    # Global styles, design tokens, reduced-motion support
-```
-
 ```text
-Pasted input -> line-aware chunking -> Web Worker parser -> heuristic extractors
-             -> briefing result -> React UI / user-triggered clipboard copy
+UI -> useAnalyzer hook -> AnalyzerClient -> typed protocol -> Web Worker -> core pipeline
+                                                                  parser -> extractors
+                                                                  -> briefing result
+UI <- briefing result <- worker response <-------------------------
+UI -> user-triggered clipboard formatting/copy
 ```
 
-The analyzer (`src/lib/analyzer.ts`) is decoupled from presentation. It parses raw text into messages, then applies heuristic pattern matching to identify urgency markers, action verbs, decision language, dates/times, announcements, and @mentions. It does not use an AI/ML model; it uses transparent, auditable pattern matching.
+| Module | Responsibility |
+| --- | --- |
+| `src/App.tsx`, `src/components/` | Compose the input and briefing UI; contain presentation behavior. |
+| `src/hooks/useAnalyzer.ts` | Own analysis lifecycle, loading/error/result state, cancellation, and cleanup. |
+| `src/worker/analyzerClient.ts` | Create and reuse the worker, associate requests with IDs, enforce timeouts, ignore stale responses, and recover failed workers. |
+| `src/worker/protocol.ts`, `handleAnalyze.ts`, `analyzer.worker.ts` | Define the typed message contract and execute analysis off the UI thread. |
+| `src/core/parser.ts` | Parse supported chat lines into sender-attributed messages. |
+| `src/core/extractors/` | Detect category-specific cues for urgency, actions, decisions, dates, announcements, and mentions. |
+| `src/core/analyze.ts` | Orchestrate parsing and extractors, deduplicate and order results, then build the briefing summary. |
+| `src/core/types.ts`, `format.ts`, `id.ts`, `index.ts` | Shared core types, deterministic per-run IDs, clipboard/warning formatting, and public exports. |
+| `src/lib/analyzer.ts` | Compatibility re-export for existing imports. |
+
+The core uses heuristic pattern matching, not an AI/ML model. It has no React, DOM, or component imports. The source makes no network requests; analysis runs in the browser.
+
+To add an extractor, create a pure module under `src/core/extractors/` that exports a function with the shared `Extractor<T>` signature from `src/core/types.ts`. Keep category cue detection isolated, wire its output into the per-message orchestration in `src/core/analyze.ts`, and add synthetic regression tests for matched and non-matched input. Preserve the established item types, evidence fields, deduplication, and per-run ID generation.
 
 There is no backend so pasted text can be analyzed in the browser without sending it to an app server, and there is no backend service to operate or pay for. Client-side processing can work offline when the app and worker assets are available locally, though offline use across reloads is not guaranteed. The trade-off is that conversations do not sync across devices.
 
