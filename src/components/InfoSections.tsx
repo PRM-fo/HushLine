@@ -24,11 +24,11 @@ export function HowItWorks() {
       <div className="max-w-5xl mx-auto px-6 lg:px-10">
         <div className="text-center mb-14">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-8 h-px bg-teal-400/40" />
+            <div className="w-8 h-px bg-primary-500/40" />
             <span className="section-label">How it works</span>
-            <div className="w-8 h-px bg-teal-400/40" />
+            <div className="w-8 h-px bg-primary-500/40" />
           </div>
-          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-600 text-ice-50 text-balance">
+          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-600 text-text-main text-balance">
             Three steps from noise to clarity.
           </h2>
         </div>
@@ -42,15 +42,15 @@ export function HowItWorks() {
                 className="glass-panel glass-panel-hover p-6 lg:p-8 relative group"
               >
                 {/* Step number */}
-                <div className="absolute top-6 right-6 font-display text-5xl font-700 text-midnight-600/40 group-hover:text-teal-400/20 transition-colors duration-500">
+                <div className="absolute top-6 right-6 font-display text-5xl font-700 text-midnight-600/40 group-hover:text-primary-500/20 transition-colors duration-500">
                   {i + 1}
                 </div>
 
-                <div className="w-12 h-12 rounded-xl bg-teal-400/10 border border-teal-400/15 flex items-center justify-center mb-5">
-                  <Icon className="w-6 h-6 text-teal-300" />
+                <div className="w-12 h-12 rounded-xl bg-primary-500/10 border border-primary-500/15 flex items-center justify-center mb-5">
+                  <Icon className="w-6 h-6 text-primary-300" />
                 </div>
-                <h3 className="font-display text-lg font-600 text-ice-50 mb-2">{step.title}</h3>
-                <p className="text-sm text-ice-300 leading-relaxed">{step.desc}</p>
+                <h3 className="font-display text-lg font-600 text-text-main mb-2">{step.title}</h3>
+                <p className="text-sm text-text-muted leading-relaxed">{step.desc}</p>
               </div>
             );
           })}
@@ -92,14 +92,14 @@ export function Privacy() {
       <div className="relative max-w-5xl mx-auto px-6 lg:px-10">
         <div className="text-center mb-14">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-8 h-px bg-teal-400/40" />
+            <div className="w-8 h-px bg-primary-500/40" />
             <span className="section-label">Privacy</span>
-            <div className="w-8 h-px bg-teal-400/40" />
+            <div className="w-8 h-px bg-primary-500/40" />
           </div>
-          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-600 text-ice-50 text-balance mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-600 text-text-main text-balance mb-4">
             Your conversations stay yours.
           </h2>
-          <p className="text-ice-300 max-w-2xl mx-auto text-balance">
+          <p className="text-text-muted max-w-2xl mx-auto text-balance">
             Privacy isn't a feature we tacked on — it's the foundation. Everything happens in your browser. Nothing is sent, stored, or shared.
           </p>
         </div>
@@ -113,13 +113,13 @@ export function Privacy() {
                 className="glass-panel glass-panel-hover p-6 flex gap-4"
               >
                 <div className="flex-shrink-0">
-                  <div className="w-10 h-10 rounded-xl bg-teal-400/10 border border-teal-400/15 flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-teal-300" />
+                  <div className="w-10 h-10 rounded-xl bg-primary-500/10 border border-primary-500/15 flex items-center justify-center">
+                    <Icon className="w-5 h-5 text-primary-300" />
                   </div>
                 </div>
                 <div>
-                  <h3 className="font-display text-base font-600 text-ice-50 mb-1.5">{p.title}</h3>
-                  <p className="text-sm text-ice-300 leading-relaxed">{p.desc}</p>
+                  <h3 className="font-display text-base font-600 text-text-main mb-1.5">{p.title}</h3>
+                  <p className="text-sm text-text-muted leading-relaxed">{p.desc}</p>
                 </div>
               </div>
             );
@@ -127,9 +127,9 @@ export function Privacy() {
         </div>
 
         {/* Trust indicator */}
-        <div className="mt-8 flex items-center justify-center gap-3 px-6 py-4 rounded-xl bg-teal-400/8 border border-teal-400/15 max-w-md mx-auto">
-          <Eye className="w-5 h-5 text-teal-300" />
-          <p className="text-sm text-teal-200">
+        <div className="mt-8 flex items-center justify-center gap-3 px-6 py-4 rounded-xl bg-primary-500/8 border border-primary-500/15 max-w-md mx-auto">
+          <Eye className="w-5 h-5 text-primary-300" />
+          <p className="text-sm text-primary-200">
             <span className="font-600">Verified:</span> zero network requests during analysis.
           </p>
         </div>

@@ -45,11 +45,11 @@ const PRIORITIES: { key: Priority; label: string }[] = [
 
 function PriorityBadge({ level, label }: { level: 'high' | 'medium' | 'explicit' | 'inferred' | 'low'; label: string }) {
   const styles: Record<string, string> = {
-    high: 'bg-red-500/15 text-red-300 border border-red-500/20',
-    explicit: 'bg-teal-400/15 text-teal-200 border border-teal-400/20',
-    medium: 'bg-amber-500/15 text-amber-300 border border-amber-500/20',
-    inferred: 'bg-ice-500/15 text-ice-300 border border-ice-500/20',
-    low: 'bg-ice-500/10 text-ice-400 border border-ice-500/15',
+    high: 'bg-gradient-to-r from-primary-500/30 to-secondary-500/30 text-primary-200 border border-primary-500/40',
+    explicit: 'bg-gradient-to-r from-primary-400/25 to-secondary-400/25 text-primary-200 border border-primary-400/35',
+    medium: 'bg-gradient-to-r from-secondary-500/25 to-primary-500/25 text-secondary-200 border border-secondary-500/35',
+    inferred: 'bg-gradient-to-r from-text-muted/20 to-primary-400/20 text-text-muted border border-text-muted/30',
+    low: 'bg-gradient-to-r from-text-muted/15 to-midnight-500/15 text-text-muted border border-text-muted/25',
   };
   return <span className={`priority-badge ${styles[level] || styles.low}`}>{label}</span>;
 }
@@ -57,17 +57,17 @@ function PriorityBadge({ level, label }: { level: 'high' | 'medium' | 'explicit'
 function SnippetBlock({ snippet, sender, timestamp }: { snippet: string; sender: string; timestamp?: string }) {
   const parts = snippet.split(/(\*\*[^*]+\*\*)/g);
   return (
-    <div className="mt-3 p-3 rounded-lg bg-midnight-900/50 border border-ice-500/5">
+    <div className="mt-3 p-3 rounded-lg bg-gradient-to-br from-midnight-900/60 to-midnight-950/60 border border-primary-500/10">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-xs font-mono text-teal-300/70">{sender}</span>
+        <span className="text-xs font-mono text-primary-300/80">{sender}</span>
         {timestamp && (
-          <span className="text-xs text-ice-500 font-mono">{timestamp}</span>
+          <span className="text-xs text-text-muted font-mono">{timestamp}</span>
         )}
       </div>
-      <p className="text-sm text-ice-300 font-mono leading-relaxed">
+      <p className="text-sm text-text-muted font-mono leading-relaxed">
         {parts.map((part, i) =>
           part.startsWith('**') && part.endsWith('**') ? (
-            <mark key={i} className="bg-teal-400/20 text-teal-100 rounded px-0.5">
+            <mark key={i} className="bg-gradient-to-r from-primary-500/30 to-secondary-500/30 text-primary-100 rounded px-0.5">
               {part.slice(2, -2)}
             </mark>
           ) : (
@@ -81,10 +81,10 @@ function SnippetBlock({ snippet, sender, timestamp }: { snippet: string; sender:
 
 function DateBadge({ type }: { type: DateItem['type'] }) {
   const config: Record<string, { label: string; icon: typeof Clock; color: string }> = {
-    deadline: { label: 'Deadline', icon: Clock, color: 'text-red-300 bg-red-500/10' },
-    meeting: { label: 'Meeting', icon: Calendar, color: 'text-teal-300 bg-teal-400/10' },
-    event: { label: 'Event', icon: Calendar, color: 'text-ice-300 bg-ice-500/10' },
-    reminder: { label: 'Reminder', icon: AlertTriangle, color: 'text-amber-300 bg-amber-500/10' },
+    deadline: { label: 'Deadline', icon: Clock, color: 'text-primary-200 bg-gradient-to-r from-primary-500/25 to-secondary-500/25 border border-primary-500/35' },
+    meeting: { label: 'Meeting', icon: Calendar, color: 'text-secondary-200 bg-gradient-to-r from-secondary-500/25 to-primary-500/25 border border-secondary-500/35' },
+    event: { label: 'Event', icon: Calendar, color: 'text-primary-200 bg-gradient-to-r from-primary-400/25 to-secondary-400/25 border border-primary-400/35' },
+    reminder: { label: 'Reminder', icon: AlertTriangle, color: 'text-text-muted bg-gradient-to-r from-text-muted/20 to-primary-400/20 border border-text-muted/30' },
   };
   const c = config[type] || config.event;
   const Icon = c.icon;
@@ -100,11 +100,11 @@ type DateItem = BriefingResult['dates'][0];
 
 function StatPill({ icon: Icon, label, value }: { icon: typeof FileText; label: string; value: string | number }) {
   return (
-    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-midnight-800/40 border border-ice-500/8">
-      <Icon className="w-4 h-4 text-teal-300" />
+    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-gradient-to-br from-midnight-800/60 to-midnight-900/60 border border-primary-500/15">
+      <Icon className="w-4 h-4 text-primary-300" />
       <div className="flex flex-col">
-        <span className="text-xs text-ice-400">{label}</span>
-        <span className="text-sm font-medium text-ice-50">{value}</span>
+        <span className="text-xs text-text-muted">{label}</span>
+        <span className="text-sm font-medium text-text-main">{value}</span>
       </div>
     </div>
   );
@@ -116,10 +116,10 @@ function UrgentCard({ item, priorityFilter }: { item: BriefingResult['urgent'][0
   return (
     <div className="glass-panel glass-panel-hover p-4 lg:p-5">
       <div className="flex items-start justify-between gap-3 mb-2">
-        <p className="text-ice-100 font-medium leading-snug">{item.title}</p>
+        <p className="text-text-main font-medium leading-snug">{item.title}</p>
         <PriorityBadge level={priority} label={priority === 'high' ? 'High priority' : 'Medium'} />
       </div>
-      <p className="text-sm text-ice-400">{item.reason}</p>
+      <p className="text-sm text-text-muted">{item.reason}</p>
       <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
     </div>
   );
@@ -131,13 +131,13 @@ function ActionCard({ item, priorityFilter }: { item: BriefingResult['actions'][
     item.confidence === 'explicit' ? 'medium' : 'low';
   if (priorityFilter !== 'all' && priorityFilter !== priority) return null;
   return (
-    <div className="glass-panel glass-panel-hover p-4 lg:p-5 border-l-2 border-l-teal-400/40">
+    <div className="glass-panel glass-panel-hover p-4 lg:p-5 border-l-2 border-l-primary-500/40">
       <div className="flex items-start justify-between gap-3 mb-2">
-        <p className="text-ice-100 font-medium leading-snug">{item.task}</p>
+        <p className="text-text-main font-medium leading-snug">{item.task}</p>
         <PriorityBadge level={item.confidence === 'explicit' ? 'explicit' : 'inferred'} label={item.confidence === 'explicit' ? 'Explicitly assigned' : 'Inferred'} />
       </div>
       {item.deadline && (
-        <div className="flex items-center gap-1.5 text-sm text-amber-300 mb-1">
+        <div className="flex items-center gap-1.5 text-sm text-primary-300 mb-1">
           <Clock className="w-3.5 h-3.5" />
           <span>Deadline: {item.deadline}</span>
         </div>
@@ -198,12 +198,12 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         </div>
 
         {/* On-device indicator */}
-        <div className="flex items-center gap-2 mb-6 px-4 py-2.5 rounded-xl bg-teal-400/8 border border-teal-400/15" role="status">
-          <Cpu className="w-4 h-4 text-teal-300" />
-          <span className="text-sm text-teal-200">
+        <div className="flex items-center gap-2 mb-6 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 border border-primary-500/25" role="status">
+          <Cpu className="w-4 h-4 text-primary-300" />
+          <span className="text-sm text-primary-200">
             Processed entirely on your device — your conversation was never sent anywhere.
           </span>
-          <span className="ml-auto text-xs font-mono text-ice-400">at {result.processedAt}</span>
+          <span className="ml-auto text-xs font-mono text-text-muted">at {result.processedAt}</span>
         </div>
 
         {/* Stats */}
@@ -247,7 +247,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         </div>
 
         {/* Filter tabs */}
-        <div className="flex flex-wrap gap-2 mb-4 sticky top-16 z-30 py-3 -mx-2 px-2 bg-midnight-950/80 backdrop-blur-md rounded-xl" role="group" aria-label="Filter results by category">
+        <div className="flex flex-wrap gap-2 mb-4 sticky top-16 z-30 py-3 -mx-2 px-2 bg-aurora-bg/80 backdrop-blur-md rounded-xl" role="group" aria-label="Filter results by category">
           {CATEGORIES.map((cat) => {
             const Icon = cat.icon;
             const isActive = activeCategory === cat.key;
@@ -258,8 +258,8 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                 aria-pressed={isActive}
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-teal-400/15 text-teal-200 border border-teal-400/20'
-                    : 'text-ice-400 hover:text-ice-200 hover:bg-midnight-700/40 border border-transparent'
+                    ? 'bg-primary-500/15 text-primary-200 border border-primary-500/20'
+                    : 'text-text-muted hover:text-text-main hover:bg-midnight-700/40 border border-transparent'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -272,7 +272,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         {/* Priority filter */}
         {showPriorityControls && (
           <div className="flex flex-wrap items-center gap-2 mb-8" role="group" aria-label="Filter by priority">
-            <span className="text-xs text-ice-500 font-mono">Priority:</span>
+            <span className="text-xs text-text-muted font-mono">Priority:</span>
             {PRIORITIES.map((p) => (
               <button
                 key={p.key}
@@ -280,8 +280,8 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                 aria-pressed={priorityFilter === p.key}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
                   priorityFilter === p.key
-                    ? 'bg-midnight-700/60 text-ice-100 border border-ice-500/20'
-                    : 'text-ice-500 hover:text-ice-300 border border-transparent'
+                    ? 'bg-midnight-700/60 text-text-main border border-text-muted/20'
+                    : 'text-text-muted hover:text-text-main border border-transparent'
                 }`}
               >
                 {p.label}
@@ -294,10 +294,10 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         {showCategory('urgent') && (
           <div className="mb-8 animate-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="w-5 h-5 text-red-300" />
-              <h3 className="font-display text-xl font-600 text-ice-50">Urgent</h3>
+              <AlertTriangle className="w-5 h-5 text-primary-300" />
+              <h3 className="font-display text-xl font-600 text-text-main">Urgent</h3>
               {result.urgent.length > 0 && (
-                <span className="text-xs text-ice-400">— time-sensitive, handle first</span>
+                <span className="text-xs text-text-muted">— time-sensitive, handle first</span>
               )}
             </div>
             {result.urgent.length === 0 ? (
@@ -317,16 +317,16 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
           <div className="mb-8 animate-fade-in-up">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <ClipboardList className="w-5 h-5 text-teal-300" />
-                <h3 className="font-display text-xl font-600 text-ice-50">Your Actions</h3>
+                <ClipboardList className="w-5 h-5 text-primary-300" />
+                <h3 className="font-display text-xl font-600 text-text-main">Your Actions</h3>
                 {userActions.length > 0 && (
-                  <span className="text-xs text-ice-400">— tasks assigned to {userName || 'you'}</span>
+                  <span className="text-xs text-text-muted">— tasks assigned to {userName || 'you'}</span>
                 )}
               </div>
               {userActions.length > 0 && (
                 <button
                   onClick={copyActions}
-                  className="flex items-center gap-1.5 text-xs text-ice-400 hover:text-teal-300 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-text-muted hover:text-primary-300 transition-colors"
                   aria-label="Copy action items to clipboard"
                 >
                   {copiedActions ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -339,7 +339,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
             ) : (
               <div className="space-y-3">
                 {userActions.length === 0 && (
-                  <p className="text-sm text-ice-400 mb-3">
+                  <p className="text-sm text-text-muted mb-3">
                     No tasks were explicitly assigned to {userName || 'you'}. Try adding your name in the input field above.
                   </p>
                 )}
@@ -348,7 +348,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                 ))}
                 {otherActions.length > 0 && (
                   <details className="mt-4 group">
-                    <summary className="flex items-center gap-2 text-sm text-ice-400 cursor-pointer hover:text-ice-200 transition-colors list-none">
+                    <summary className="flex items-center gap-2 text-sm text-text-muted cursor-pointer hover:text-text-main transition-colors list-none">
                       <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
                       Other tasks ({otherActions.length})
                     </summary>
@@ -356,12 +356,12 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                       {otherActions.map((item) => (
                         <div key={item.id} className="glass-panel p-4 opacity-70">
                           <div className="flex items-start justify-between gap-3 mb-2">
-                            <p className="text-ice-200 text-sm leading-snug">{item.task}</p>
+                            <p className="text-text-main text-sm leading-snug">{item.task}</p>
                             <PriorityBadge level={item.confidence === 'explicit' ? 'explicit' : 'inferred'} label={item.confidence === 'explicit' ? 'Explicit' : 'Inferred'} />
                           </div>
-                          <p className="text-xs text-ice-400 mb-2">Assigned to: {item.assignee}</p>
+                          <p className="text-xs text-text-muted mb-2">Assigned to: {item.assignee}</p>
                           {item.deadline && (
-                            <div className="flex items-center gap-1.5 text-sm text-amber-300 mb-1">
+                            <div className="flex items-center gap-1.5 text-sm text-primary-300 mb-1">
                               <Clock className="w-3.5 h-3.5" />
                               <span>Deadline: {item.deadline}</span>
                             </div>
@@ -381,10 +381,10 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         {showCategory('decisions') && (
           <div className="mb-8 animate-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
-              <CheckCircle2 className="w-5 h-5 text-teal-300" />
-              <h3 className="font-display text-xl font-600 text-ice-50">Decisions</h3>
+              <CheckCircle2 className="w-5 h-5 text-primary-300" />
+              <h3 className="font-display text-xl font-600 text-text-main">Decisions</h3>
               {result.decisions.length > 0 && (
-                <span className="text-xs text-ice-400">— what the group agreed on</span>
+                <span className="text-xs text-text-muted">— what the group agreed on</span>
               )}
             </div>
             {result.decisions.length === 0 ? (
@@ -394,11 +394,11 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                 {result.decisions.map((item) => (
                   <div key={item.id} className="glass-panel glass-panel-hover p-4 lg:p-5">
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 w-5 h-5 rounded-full bg-teal-400/15 flex items-center justify-center flex-shrink-0">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-teal-300" />
+                      <div className="mt-0.5 w-5 h-5 rounded-full bg-primary-500/15 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-primary-300" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-ice-100 font-medium leading-snug">{item.decision}</p>
+                        <p className="text-text-main font-medium leading-snug">{item.decision}</p>
                         <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
                       </div>
                     </div>
@@ -413,10 +413,10 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         {showCategory('dates') && (
           <div className="mb-8 animate-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-5 h-5 text-teal-300" />
-              <h3 className="font-display text-xl font-600 text-ice-50">Important Dates</h3>
+              <Calendar className="w-5 h-5 text-primary-300" />
+              <h3 className="font-display text-xl font-600 text-text-main">Important Dates</h3>
               {result.dates.length > 0 && (
-                <span className="text-xs text-ice-400">— deadlines, meetings, events</span>
+                <span className="text-xs text-text-muted">— deadlines, meetings, events</span>
               )}
             </div>
             {result.dates.length === 0 ? (
@@ -427,9 +427,9 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                   <div key={item.id} className="glass-panel glass-panel-hover p-4 lg:p-5">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <DateBadge type={item.type} />
-                      <span className="text-sm font-mono text-teal-200 font-medium">{item.date}</span>
+                      <span className="text-sm font-mono text-primary-200 font-medium">{item.date}</span>
                     </div>
-                    <p className="text-sm text-ice-200 leading-snug">{item.event}</p>
+                    <p className="text-sm text-text-main leading-snug">{item.event}</p>
                     <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
                   </div>
                 ))}
@@ -442,10 +442,10 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         {showCategory('mentions') && (
           <div className="mb-8 animate-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
-              <AtSign className="w-5 h-5 text-teal-300" />
-              <h3 className="font-display text-xl font-600 text-ice-50">Mentions</h3>
+              <AtSign className="w-5 h-5 text-primary-300" />
+              <h3 className="font-display text-xl font-600 text-text-main">Mentions</h3>
               {result.mentions.length > 0 && (
-                <span className="text-xs text-ice-400">— messages that tag you or others</span>
+                <span className="text-xs text-text-muted">— messages that tag you or others</span>
               )}
             </div>
             {result.mentions.length === 0 ? (
@@ -453,14 +453,14 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
             ) : (
               <div className="space-y-3">
                 {userMentions.length > 0 && (
-                  <p className="text-sm text-teal-200 mb-2">
+                  <p className="text-sm text-primary-200 mb-2">
                     {userMentions.length} message{userMentions.length > 1 ? 's' : ''} mention{userMentions.length > 1 ? '' : 's'} {userName || 'you'} directly.
                   </p>
                 )}
                 {userMentions.map((item) => (
-                  <div key={item.id} className="glass-panel glass-panel-hover p-4 lg:p-5 border-l-2 border-l-teal-400/40">
+                  <div key={item.id} className="glass-panel glass-panel-hover p-4 lg:p-5 border-l-2 border-l-primary-500/40">
                     <div className="flex items-start justify-between gap-3 mb-2">
-                      <p className="text-ice-100 font-medium leading-snug">{item.context}</p>
+                      <p className="text-text-main font-medium leading-snug">{item.context}</p>
                       <PriorityBadge level="explicit" label={`@${item.mentionedUser}`} />
                     </div>
                     <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
@@ -468,7 +468,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                 ))}
                 {otherMentions.length > 0 && (
                   <details className="mt-4 group">
-                    <summary className="flex items-center gap-2 text-sm text-ice-400 cursor-pointer hover:text-ice-200 transition-colors list-none">
+                    <summary className="flex items-center gap-2 text-sm text-text-muted cursor-pointer hover:text-text-main transition-colors list-none">
                       <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
                       Other mentions ({otherMentions.length})
                     </summary>
@@ -476,7 +476,7 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                       {otherMentions.map((item) => (
                         <div key={item.id} className="glass-panel p-4 opacity-70">
                           <div className="flex items-start justify-between gap-3 mb-2">
-                            <p className="text-ice-200 text-sm leading-snug">{item.context}</p>
+                            <p className="text-text-main text-sm leading-snug">{item.context}</p>
                             <PriorityBadge level="inferred" label={`@${item.mentionedUser}`} />
                           </div>
                           <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
@@ -494,10 +494,10 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
         {showCategory('announcements') && (
           <div className="mb-8 animate-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
-              <Megaphone className="w-5 h-5 text-teal-300" />
-              <h3 className="font-display text-xl font-600 text-ice-50">What You Missed</h3>
+              <Megaphone className="w-5 h-5 text-primary-300" />
+              <h3 className="font-display text-xl font-600 text-text-main">What You Missed</h3>
               {result.announcements.length > 0 && (
-                <span className="text-xs text-ice-400">— buried announcements you'd scroll past</span>
+                <span className="text-xs text-text-muted">— buried announcements you'd scroll past</span>
               )}
             </div>
             {result.announcements.length === 0 ? (
@@ -507,12 +507,12 @@ export function Briefing({ result, userName, onReset }: BriefingProps) {
                 {result.announcements.map((item) => (
                   <div key={item.id} className="glass-panel glass-panel-hover p-4 lg:p-5">
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center flex-shrink-0">
-                        <Megaphone className="w-3.5 h-3.5 text-amber-300" />
+                      <div className="mt-0.5 w-5 h-5 rounded-full bg-secondary-500/15 flex items-center justify-center flex-shrink-0">
+                        <Megaphone className="w-3.5 h-3.5 text-secondary-300" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-ice-100 font-medium leading-snug">{item.title}</p>
-                        <p className="text-xs text-amber-300/70 mt-1 italic">{item.buriedReason}</p>
+                        <p className="text-text-main font-medium leading-snug">{item.title}</p>
+                        <p className="text-xs text-secondary-300/70 mt-1 italic">{item.buriedReason}</p>
                         <SnippetBlock snippet={item.snippet} sender={item.sender} timestamp={item.timestamp} />
                       </div>
                     </div>

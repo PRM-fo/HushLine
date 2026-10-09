@@ -56,7 +56,7 @@ export function ConversationInput({
         {/* Input card */}
         <div
           className={`glass-panel transition-all duration-300 ${
-            isFocused ? 'border-teal-400/30 shadow-lg shadow-teal-400/5' : ''
+            isFocused ? 'border-primary-500/50 shadow-xl shadow-primary-500/15' : ''
           }`}
         >
           {/* Textarea */}
@@ -68,7 +68,7 @@ export function ConversationInput({
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder="Paste your conversation here…&#10;&#10;Supported formats:&#10;Name: message text&#10;Name [timestamp]: message text&#10;WhatsApp export format"
-              className="w-full h-56 sm:h-64 bg-transparent resize-none px-5 py-4 text-ice-50 placeholder-ice-500/50 focus:outline-none focus:ring-2 focus:ring-teal-400/10 rounded-xl text-sm leading-relaxed font-mono"
+              className="w-full h-56 sm:h-64 bg-transparent resize-none px-5 py-4 text-text-main placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary-500/20 rounded-xl text-sm leading-relaxed font-mono"
               spellCheck={false}
               disabled={isProcessing}
               aria-label="Paste your conversation messages here"
@@ -104,7 +104,7 @@ export function ConversationInput({
           {charCount > 0 && (
             <div className="h-0.5 bg-midnight-900 overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-teal-400 to-teal-300 transition-all duration-300"
+                className="h-full bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-400 transition-all duration-300"
                 style={{ width: `${progressPct}%` }}
               />
             </div>
@@ -115,7 +115,7 @@ export function ConversationInput({
         <div className="mt-6 flex flex-col sm:flex-row gap-3">
           {/* Username */}
           <div className="relative flex-1 sm:max-w-xs">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ice-500" />
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-500/60" />
             <input
               type="text"
               value={userName}

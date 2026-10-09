@@ -4,43 +4,61 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Midnight Aurora Palette
+        aurora: {
+          bg: '#100D18',
+          primary: '#8B7CFF',
+          secondary: '#58C7FF',
+          text: '#F4F0E8',
+          muted: '#A6A0B8',
+        },
+        // Extended palette based on Aurora theme
         midnight: {
-          50: '#f0f4f6',
-          100: '#d9e4e8',
-          200: '#b3c8d1',
-          300: '#7d9fab',
-          400: '#4a6b7a',
-          500: '#2c4a59',
-          600: '#1e3543',
-          700: '#152631',
-          800: '#0e1b24',
-          900: '#081119',
-          950: '#040a0f',
+          50: '#1a1625',
+          100: '#241f33',
+          200: '#2e2841',
+          300: '#38314f',
+          400: '#423a5d',
+          500: '#4c436b',
+          600: '#564c79',
+          700: '#605587',
+          800: '#6a5e95',
+          900: '#7467a3',
+          950: '#100D18',
         },
-        teal: {
-          50: '#effcf9',
-          100: '#cbf7ee',
-          200: '#97ede0',
-          300: '#5ddccd',
-          400: '#2cc4b5',
-          500: '#14a89a',
-          600: '#0d877c',
-          700: '#106b64',
-          800: '#115451',
-          900: '#134544',
-          950: '#042827',
+        // Primary accent (violet) variations
+        primary: {
+          50: '#f4f0ff',
+          100: '#e8e0ff',
+          200: '#d0c0ff',
+          300: '#b8a0ff',
+          400: '#a080ff',
+          500: '#8B7CFF',
+          600: '#7868e6',
+          700: '#6554cc',
+          800: '#5240b3',
+          900: '#3f2c99',
+          950: '#2c1c80',
         },
-        ice: {
-          50: '#f7fafc',
-          100: '#eef4f8',
-          200: '#dbe7ee',
-          300: '#b9cfdd',
-          400: '#8fb0c4',
-          500: '#6b91a8',
-          600: '#547488',
-          700: '#445e6e',
-          800: '#3a4f5c',
-          900: '#344450',
+        // Secondary accent (blue) variations
+        secondary: {
+          50: '#f0f9ff',
+          100: '#e0f3ff',
+          200: '#c0e7ff',
+          300: '#a0dbff',
+          400: '#80cfff',
+          500: '#58C7FF',
+          600: '#4aa8e6',
+          700: '#3c89cc',
+          800: '#2e6ab3',
+          900: '#204b99',
+          950: '#122c80',
+        },
+        // Text color variations
+        text: {
+          main: '#F4F0E8',
+          muted: '#A6A0B8',
+          dim: '#6b6578',
         },
       },
       fontFamily: {
@@ -61,6 +79,7 @@ export default {
         'signal-rise': 'signalRise 1.2s ease-out forwards',
         'scatter-fade': 'scatterFade 1.5s ease-out forwards',
         'spin-slow': 'spin 3s linear infinite',
+        'gradient-shift': 'gradientShift 3s ease infinite',
       },
       keyframes: {
         wavePulse: {
@@ -103,6 +122,10 @@ export default {
         scatterFade: {
           '0%': { opacity: '1', transform: 'scale(1)' },
           '100%': { opacity: '0', transform: 'scale(0.8) translateY(-20px)' },
+        },
+        gradientShift: {
+          '0%, 100%': { backgroundPosition: '0% center' },
+          '50%': { backgroundPosition: '100% center' },
         },
       },
       backdropBlur: {

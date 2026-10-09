@@ -16,11 +16,11 @@ export function Footer() {
             </span>
           </div>
 
-          <p className="text-sm text-ice-400">
+          <p className="text-sm text-text-muted">
             Silence the noise. Keep the signal.
           </p>
 
-          <p className="text-xs text-ice-500 font-mono">
+          <p className="text-xs text-text-dim font-mono">
             Built for the unread problem · 100% on-device
           </p>
         </div>

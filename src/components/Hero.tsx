@@ -23,19 +23,21 @@ function SignalVisual() {
     { x: 70, y: 90, delay: '0.55s', size: 3 },
   ];
 
-  const waveBars = [12, 20, 35, 50, 65, 80, 95, 80, 65, 50, 35, 20, 12];
+  const waveBars = [15, 25, 40, 55, 70, 85, 100, 85, 70, 55, 40, 25, 15];
 
   return (
     <div className="relative w-full h-[320px] sm:h-[400px] flex items-center justify-center">
-      {/* Background glow */}
-      <div className="absolute inset-0 bg-radial-glow rounded-3xl" />
+      {/* Background glow - Midnight Aurora */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 via-secondary-500/5 to-primary-400/10 rounded-3xl" />
 
-      {/* Scattered noise dots */}
+      {/* Scattered noise dots - Aurora colors */}
       <div className="absolute inset-0">
         {scatterDots.map((dot, i) => (
           <div
             key={i}
-            className="absolute rounded-full bg-ice-400/30 animate-float"
+            className={`absolute rounded-full animate-float ${
+              i % 3 === 0 ? 'bg-primary-500/40' : i % 3 === 1 ? 'bg-secondary-500/40' : 'bg-primary-400/40'
+            }`}
             style={{
               left: `${dot.x}%`,
               top: `${dot.y}%`,
@@ -48,17 +50,25 @@ function SignalVisual() {
         ))}
       </div>
 
-      {/* Central signal wave */}
+      {/* Central signal wave - Aurora gradient */}
       <div className="relative flex items-end justify-center gap-1 h-48">
-        {/* Glow behind wave */}
+        {/* Glow behind wave - violet-blue glow */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-32 h-32 bg-teal-400/10 rounded-full blur-3xl animate-glow-pulse" />
+          <div className="w-40 h-40 bg-gradient-to-r from-primary-500/20 via-secondary-500/20 to-primary-400/20 rounded-full blur-3xl animate-glow-pulse" />
         </div>
 
         {waveBars.map((h, i) => (
           <div
             key={i}
-            className="w-1.5 sm:w-2 rounded-full bg-gradient-to-t from-teal-500/40 via-teal-300 to-teal-200 animate-wave-pulse"
+            className={`w-1.5 sm:w-2 rounded-full animate-wave-pulse ${
+              i % 4 === 0
+                ? 'bg-gradient-to-t from-primary-500/60 via-primary-400 to-primary-200'
+                : i % 4 === 1
+                ? 'bg-gradient-to-t from-secondary-500/60 via-secondary-400 to-secondary-200'
+                : i % 4 === 2
+                ? 'bg-gradient-to-t from-primary-600/60 via-primary-500/80 to-primary-400/40'
+                : 'bg-gradient-to-t from-secondary-600/60 via-secondary-500/80 to-secondary-400/40'
+            }`}
             style={{
               height: `${h}%`,
               animationDelay: `${i * 0.12}s`,
@@ -68,10 +78,10 @@ function SignalVisual() {
         ))}
       </div>
 
-      {/* Clarity label */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full bg-teal-400/10 border border-teal-400/20">
-        <Sparkles className="w-3.5 h-3.5 text-teal-300" />
-        <span className="text-xs font-mono text-teal-200 tracking-wide">your signal, extracted</span>
+      {/* Clarity label - Aurora style */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary-500/15 to-secondary-500/15 border border-primary-500/30">
+        <Sparkles className="w-3.5 h-3.5 text-primary-300" />
+        <span className="text-xs font-mono text-primary-200 tracking-wide">your signal, extracted</span>
       </div>
     </div>
   );
@@ -88,9 +98,9 @@ export function Hero({ onFindSignal }: HeroProps) {
           {/* Left: Text */}
           <div className="text-center lg:text-left">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-midnight-800/60 border border-teal-400/15 mb-8 animate-fade-in-up">
-              <span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse" />
-              <span className="text-xs font-mono uppercase tracking-[0.15em] text-teal-200/80">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-primary-500/15 to-secondary-500/15 border border-primary-500/30 mb-8 animate-fade-in-up">
+              <span className="w-2 h-2 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 animate-pulse" />
+              <span className="text-xs font-mono uppercase tracking-[0.15em] text-primary-200/90">
                 Privacy-first · Runs in your browser
               </span>
             </div>

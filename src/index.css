@@ -21,12 +21,12 @@
   }
 
   body {
-    @apply bg-midnight-950 text-ice-100 font-sans antialiased;
+    @apply bg-aurora-bg text-text-main font-sans antialiased;
     font-feature-settings: 'ss01', 'cv01', 'cv03';
   }
 
   ::selection {
-    @apply bg-teal-400/30 text-ice-50;
+    @apply bg-primary-500/30 text-text-main;
   }
 
   /* Custom scrollbar */
@@ -36,51 +36,56 @@
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-midnight-900;
+    @apply bg-midnight-950;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-midnight-600 rounded-full border-2 border-midnight-900;
+    @apply bg-text-muted/30 rounded-full border-2 border-midnight-950;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-midnight-500;
+    @apply bg-primary-500/50;
   }
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-midnight-800/40 backdrop-blur-xl border border-ice-500/10 rounded-2xl;
+    @apply bg-gradient-to-br from-midnight-800/60 to-midnight-900/60 backdrop-blur-xl border border-text-muted/10 rounded-2xl;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   .glass-panel-hover {
-    @apply transition-all duration-300 hover:border-teal-400/30 hover:bg-midnight-800/60;
+    @apply transition-all duration-300 hover:border-primary-500/40 hover:from-midnight-700/60 hover:to-midnight-800/60 hover:shadow-2xl hover:shadow-primary-500/10;
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-ice-50 via-teal-200 to-teal-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary-400 via-secondary-400 to-primary-300 bg-clip-text text-transparent;
+    background-size: 200% auto;
+    animation: gradientShift 3s ease infinite;
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-midnight-950
-      bg-gradient-to-r from-teal-300 to-teal-400 hover:from-teal-200 hover:to-teal-300
-      transition-all duration-300 hover:shadow-lg hover:shadow-teal-400/20 active:scale-95;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-aurora-bg
+      bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-400 hover:from-primary-400 hover:via-secondary-400 hover:to-primary-300
+      transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/30 active:scale-95;
+    background-size: 200% auto;
+    animation: gradientShift 3s ease infinite;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-ice-100
-      bg-midnight-700/50 border border-ice-500/15 hover:border-teal-400/40 hover:bg-midnight-700/80
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-text-main
+      bg-gradient-to-br from-midnight-700/80 to-midnight-800/80 border border-primary-500/20 hover:border-primary-500/50 hover:from-midnight-600/80 hover:to-midnight-700/80
       transition-all duration-300 active:scale-95;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-ice-300
-      hover:text-ice-50 hover:bg-midnight-700/40 transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-text-muted
+      hover:text-primary-300 hover:bg-midnight-700/40 transition-all duration-200;
   }
 
   .input-field {
-    @apply w-full bg-midnight-900/60 border border-ice-500/10 rounded-xl px-4 py-3 text-ice-50
-      placeholder-ice-500/60 focus:border-teal-400/50 focus:outline-none focus:ring-2 focus:ring-teal-400/10
+    @apply w-full bg-gradient-to-br from-midnight-900/80 to-midnight-950/80 border border-text-muted/20 rounded-xl px-4 py-3 text-text-main
+      placeholder-text-muted/60 focus:border-primary-500/60 focus:outline-none focus:ring-2 focus:ring-primary-500/20
       transition-all duration-200;
   }
 
@@ -89,14 +94,14 @@
   }
 
   .section-label {
-    @apply text-xs font-mono uppercase tracking-[0.2em] text-teal-300/70;
+    @apply text-xs font-mono uppercase tracking-[0.2em] text-primary-400/80;
   }
 
   .shimmer-bg {
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(44, 196, 181, 0.08) 50%,
+      rgba(139, 124, 255, 0.15) 50%,
       transparent 100%
     );
     background-size: 200% 100%;
@@ -110,16 +115,25 @@
 
   .bg-grid {
     background-image:
-      linear-gradient(to right, rgba(139, 168, 187, 0.04) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(139, 168, 187, 0.04) 1px, transparent 1px);
+      linear-gradient(to right, rgba(139, 124, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(139, 124, 255, 0.04) 1px, transparent 1px);
     background-size: 48px 48px;
   }
 
   .bg-radial-glow {
-    background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(20, 168, 154, 0.12), transparent 70%);
+    background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(139, 124, 255, 0.12), rgba(88, 199, 255, 0.08), transparent 70%);
   }
 
   .mask-fade-b {
     mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  }
+
+  @keyframes gradientShift {
+    0%, 100% {
+      background-position: 0% center;
+    }
+    50% {
+      background-position: 100% center;
+    }
   }
 }
