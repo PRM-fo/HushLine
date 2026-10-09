@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BriefingResult } from '@/core/types';
-import { AnalyzerClient, AnalyzerClientError } from '@/worker/analyzerClient';
+import { AnalyzerApiClient, AnalyzerApiError, type AnalysisOutcome } from '@/services/analyzerApiClient';
 
 export function useAnalyzer(userName: string) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<BriefingResult | null>(null);
+  const [analysisMetadata, setAnalysisMetadata] = useState<AnalysisOutcome['metadata'] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const clientRef = useRef<AnalyzerClient | null>(null);
+  const clientRef = useRef<AnalyzerApiClient | null>(null);
   const requestVersionRef = useRef(0);
 
   useEffect(() => {
-    const client = new AnalyzerClient();
+    const client = new AnalyzerApiClient();
     clientRef.current = client;
     return () => {
       requestVersionRef.current += 1;
@@ -25,20 +26,23 @@ export function useAnalyzer(userName: string) {
       return;
     }
 
-    const client = clientRef.current ?? new AnalyzerClient();
+    const client = clientRef.current ?? new AnalyzerApiClient();
     clientRef.current = client;
     const requestVersion = ++requestVersionRef.current;
     onStarted?.();
     setError(null);
+    setResult(null);
+    setAnalysisMetadata(null);
     setIsProcessing(true);
 
-    void client.analyze(input, userName.trim() || undefined).then((analysisResult) => {
+    void client.analyze(input, userName.trim() || undefined).then((outcome: AnalysisOutcome) => {
       if (requestVersion !== requestVersionRef.current) return;
-      setResult(analysisResult);
+      setResult(outcome.result);
+      setAnalysisMetadata(outcome.metadata);
       setIsProcessing(false);
     }).catch((cause: unknown) => {
       if (requestVersion !== requestVersionRef.current) return;
-      if (cause instanceof AnalyzerClientError && cause.cancelled) return;
+      if (cause instanceof AnalyzerApiError && cause.cancelled) return;
       setError(cause instanceof Error ? cause.message : 'Analysis failed. Please try again.');
       setIsProcessing(false);
     });
@@ -56,9 +60,11 @@ export function useAnalyzer(userName: string) {
   const reset = useCallback(() => {
     setError(null);
     setResult(null);
+    setAnalysisMetadata(null);
   }, []);
 
   return {
+    analysisMetadata,
     analyze,
     cancel,
     clearError,

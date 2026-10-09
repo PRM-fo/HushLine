@@ -44,7 +44,7 @@ export function Header({ onNavigate, onFindSignal }: HeaderProps) {
         <div className="flex items-center gap-3">
           <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-br from-primary-500/15 to-secondary-500/15 border border-primary-500/30">
             <Shield className="w-3.5 h-3.5 text-primary-300" strokeWidth={2} />
-            <span className="text-xs font-medium text-primary-200">On-device</span>
+            <span className="text-xs font-medium text-primary-200">Opt-in analysis</span>
           </div>
           <button onClick={onFindSignal} className="btn-primary text-sm px-5 py-2.5">
             Analyze conversation

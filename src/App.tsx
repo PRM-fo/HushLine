@@ -10,8 +10,9 @@ import { useAnalyzer } from '@/hooks/useAnalyzer';
 export default function App() {
   const [conversation, setConversation] = useState('');
   const [userName, setUserName] = useState('');
+  const [serverConsent, setServerConsent] = useState(false);
   const [analysisScope, setAnalysisScope] = useState<string | null>(null);
-  const { analyze, cancel, clearError, error, isProcessing, reset, result } = useAnalyzer(userName);
+  const { analysisMetadata, analyze, cancel, clearError, error, isProcessing, reset, result } = useAnalyzer(userName);
 
   const inputRef = useRef<HTMLDivElement>(null);
   const briefingRef = useRef<HTMLDivElement>(null);
@@ -44,8 +45,10 @@ export default function App() {
   }, [result, reset]);
 
   const handleAnalyze = useCallback((input: string, scope?: string) => {
+    if (!serverConsent) return;
+    setServerConsent(false);
     analyze(input, () => setAnalysisScope(scope ?? null));
-  }, [analyze]);
+  }, [analyze, serverConsent]);
 
   const handleClear = useCallback(() => {
     setConversation('');
@@ -77,6 +80,8 @@ export default function App() {
               onAnalyze={handleAnalyze}
               onCancelAnalysis={cancel}
               onClear={handleClear}
+              serverConsent={serverConsent}
+              onServerConsentChange={setServerConsent}
               isProcessing={isProcessing}
               error={error}
             />
@@ -85,7 +90,13 @@ export default function App() {
 
         {result && (
           <div ref={briefingRef}>
-            <Briefing result={result} userName={userName} onReset={handleReset} analysisScope={analysisScope} />
+            <Briefing
+              result={result}
+              userName={userName}
+              onReset={handleReset}
+              analysisScope={analysisScope}
+              analysisMetadata={analysisMetadata}
+            />
           </div>
         )}
 

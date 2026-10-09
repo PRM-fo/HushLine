@@ -9,8 +9,8 @@ export function HowItWorks() {
     },
     {
       icon: Cpu,
-      title: 'Analyze on-device',
-      desc: 'The analyzer is implemented in the browser and uses pattern matching; there is no server-side analysis endpoint in this app.',
+      title: 'Choose server analysis',
+      desc: 'After you opt in, a stateless API validates the request and runs the pattern-matching engine. It does not intentionally persist conversation text.',
     },
     {
       icon: Zap,
@@ -64,8 +64,8 @@ export function Privacy() {
   const principles = [
     {
       icon: Cpu,
-      title: 'Browser-side heuristic analysis',
-      desc: 'The analyzer runs in browser code, and this repository has no server-side analysis endpoint.',
+      title: 'Request-scoped server analysis',
+      desc: 'After consent, the same-origin API validates and analyzes the conversation in memory. The app does not intentionally store or log the text.',
     },
     {
       icon: Lock,
@@ -75,7 +75,7 @@ export function Privacy() {
     {
       icon: EyeOff,
       title: 'Input is not saved by the app',
-      desc: 'The current page keeps pasted text in application memory. There is no feature to save or restore conversations.',
+      desc: 'The app does not intentionally persist or log conversation text. Hosting-provider request logs and infrastructure behavior are outside the app and have not been verified.',
     },
     {
       icon: ShieldCheck,
@@ -100,7 +100,7 @@ export function Privacy() {
             How conversation analysis works.
           </h2>
           <p className="text-text-muted max-w-2xl mx-auto text-balance">
-            Conversation analysis runs in the browser with a local heuristic engine. Hosting and browser-level network behavior are outside this app's analysis.
+            Analysis is sent to Hushline's same-origin API only after consent. The app processes each request in memory and does not intentionally persist conversation text; hosting-provider logs remain outside this app's control.
           </p>
         </div>
 

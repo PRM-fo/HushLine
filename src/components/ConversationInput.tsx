@@ -10,6 +10,8 @@ interface ConversationInputProps {
   onAnalyze: (text: string, scope?: string) => void;
   onCancelAnalysis: () => void;
   onClear: () => void;
+  serverConsent: boolean;
+  onServerConsentChange: (value: boolean) => void;
   isProcessing: boolean;
   error: string | null;
 }
@@ -24,6 +26,8 @@ export function ConversationInput({
   onAnalyze,
   onCancelAnalysis,
   onClear,
+  serverConsent,
+  onServerConsentChange,
   isProcessing,
   error,
 }: ConversationInputProps) {
@@ -39,7 +43,7 @@ export function ConversationInput({
   );
   const activeChunkIndex = Math.min(selectedChunkIndex, chunks.length - 1);
   const selectedChunk = chunks[activeChunkIndex] ?? '';
-  const canAnalyze = (isOversized ? selectedChunk.length : charCount) >= MIN_CHARS && !isProcessing;
+  const canAnalyze = (isOversized ? selectedChunk.length : charCount) >= MIN_CHARS && serverConsent && !isProcessing;
 
   const handleAnalyze = () => {
     if (!canAnalyze) return;
@@ -63,7 +67,7 @@ export function ConversationInput({
         </h2>
         <p className="text-text-muted mb-8 max-w-xl">
           Paste a real conversation to uncover important decisions, tasks, and deadlines.
-          Analysis uses local pattern matching in this browser.
+          Analysis uses Hushline's server-side pattern matching. You choose whether to send each conversation.
         </p>
 
         {/* Input card */}
@@ -119,7 +123,19 @@ export function ConversationInput({
         </div>
 
         {/* Username + Analyze */}
-        <div className="mt-6 flex flex-col sm:flex-row gap-3">
+        <label className="mt-5 flex items-start gap-3 text-sm text-text-muted leading-relaxed">
+          <input
+            type="checkbox"
+            checked={serverConsent}
+            onChange={(event) => onServerConsentChange(event.target.checked)}
+            disabled={isProcessing}
+            className="mt-1 h-4 w-4 shrink-0 accent-teal-400"
+          />
+          <span>
+            I agree to send this conversation and optional name to Hushline's server for one-time analysis. The app does not intentionally store conversation text; hosting-provider logs are outside the app's control.
+          </span>
+        </label>
+        <div className="mt-4 flex flex-col sm:flex-row gap-3">
           {/* Username */}
           <div className="relative flex-1 sm:max-w-xs">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-500/60" />
@@ -127,6 +143,7 @@ export function ConversationInput({
               type="text"
               value={userName}
               onChange={(e) => onUserNameChange(e.target.value)}
+              maxLength={120}
               placeholder="Your name (optional — finds your tasks)"
               className="input-field pl-11 text-sm"
               disabled={isProcessing}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-// @ts-expect-error Node's fs is available in Vitest but Node type declarations are not installed.
+// @ts-expect-error Node's fs is available in Vitest but the browser project has no Node type declarations.
 import { readFileSync } from 'node:fs';
 import { analyzeConversation, formatBriefingForClipboard, formatUnparsedLineWarning, parseMessages } from './analyzer';
 import { createIdGenerator } from '@/core/id';
@@ -218,7 +218,7 @@ describe('parseMessages', () => {
     const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
     expect(html).toMatch(/script-src 'self'/);
     expect(html).toMatch(/style-src 'self' 'unsafe-inline'/);
-    expect(html).toMatch(/connect-src 'none'/);
+    expect(html).toMatch(/connect-src 'self'/);
     expect(html).toMatch(/worker-src 'self' blob:/);
   });
 
@@ -226,7 +226,8 @@ describe('parseMessages', () => {
     const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
     expect(readme).toMatch(/English-only/i);
     expect(readme).toMatch(/Telegram.*Slack.*unsupported/i);
-    expect(readme).toMatch(/no network calls in the source/i);
+    expect(readme).toMatch(/stateless API/i);
+    expect(readme).toMatch(/hosting-provider logs/i);
     expect(readme).not.toMatch(/100% private|verified local-only/i);
   });
 });

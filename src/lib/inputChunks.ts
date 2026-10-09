@@ -1,4 +1,6 @@
-export const MAX_ANALYSIS_CHARS = 100_000;
+import { MAX_ANALYSIS_CHARS } from '@/core/limits';
+
+export { MAX_ANALYSIS_CHARS };
 
 export function splitConversationIntoChunks(
   text: string,

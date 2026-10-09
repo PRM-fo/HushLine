@@ -16,12 +16,14 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { formatBriefingForClipboard, formatUnparsedLineWarning, type BriefingResult } from '@/lib/analyzer';
+import type { AnalyzeApiMetadata } from '@/api/analyzerProtocol';
 
 interface BriefingProps {
   result: BriefingResult;
   userName: string;
   onReset: () => void;
   analysisScope: string | null;
+  analysisMetadata: (AnalyzeApiMetadata & { requestId: string; execution: 'server' | 'local-fallback' }) | null;
 }
 
 type Category = 'all' | 'urgent' | 'actions' | 'decisions' | 'dates' | 'mentions' | 'announcements';
@@ -177,7 +179,7 @@ function ActionCard({ item, priorityFilter }: { item: BriefingResult['actions'][
   );
 }
 
-export function Briefing({ result, userName, onReset, analysisScope }: BriefingProps) {
+export function Briefing({ result, userName, onReset, analysisScope, analysisMetadata }: BriefingProps) {
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [priorityFilter, setPriorityFilter] = useState<Priority>('all');
   const [copiedSummary, setCopiedSummary] = useState(false);
@@ -249,13 +251,18 @@ export function Briefing({ result, userName, onReset, analysisScope }: BriefingP
           </button>
         </div>
 
-        {/* On-device indicator */}
+        {/* Server analysis indicator */}
         <div className="flex items-center gap-2 mb-6 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 border border-primary-500/25" role="status">
           <Cpu className="w-4 h-4 text-primary-300" />
           <span className="text-sm text-primary-200">
-            Analyzed in this browser using local pattern matching.
+            {analysisMetadata?.execution === 'local-fallback'
+              ? 'Server unavailable; analyzed locally in this browser'
+              : 'Analyzed by Hushline’s server using pattern matching'}
+            {analysisMetadata && ` in ${analysisMetadata.processingMs} ms (engine ${analysisMetadata.engineVersion})`}.
           </span>
-          <span className="ml-auto text-xs font-mono text-text-muted">at {result.processedAt}</span>
+          <span className="ml-auto text-xs font-mono text-text-muted" title={analysisMetadata?.requestId}>
+            {analysisMetadata ? `request ${analysisMetadata.requestId.slice(0, 8)}` : `at ${result.processedAt}`}
+          </span>
         </div>
         {analysisScope && (
           <p className="mb-6 text-sm text-amber-200">
